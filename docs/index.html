@@ -732,8 +732,9 @@ footer {
 </section>
 
 <section class="cta-section reveal" id="crackme">
-  <a href="#" class="crackme-btn" id="crackme-dl" onclick="openCrackmeDialog(event)">Crack Me</a>
+  <a href="./crackme-easy.exe" download class="crackme-btn" id="crackme-dl" onclick="showSubmitFlag()">Crack Me</a>
   <div style="margin-top:1rem;display:flex;gap:1rem;justify-content:center;">
+    <a href="#" class="crackme-btn" id="submit-flag-btn" style="display:none;" onclick="openFlagDialog(event)">Submit Flag</a>
     <span class="crackme-btn crackme-disabled">Research</span>
     <span class="crackme-btn crackme-disabled">Download</span>
   </div>
@@ -1243,7 +1244,10 @@ function eyeAction() {
 setTimeout(eyeAction, 1500 + Math.random() * 2000);
 
 var FLAG_HASH = '9c87ddc87b397bf5c1783597729fe4dc824dc447cede382ea76ec5e2ba98ef1f';
-function openCrackmeDialog(e) {
+function showSubmitFlag() {
+  document.getElementById('submit-flag-btn').style.display = 'inline-block';
+}
+function openFlagDialog(e) {
   e.preventDefault();
   document.getElementById('crackme-overlay').classList.add('active');
   var inp = document.getElementById('crackme-input');
@@ -1264,20 +1268,11 @@ async function checkCrackmeFlag() {
   var inp = document.getElementById('crackme-input');
   var msg = document.getElementById('crackme-msg');
   var val = inp.value.trim();
-  if (!val) { msg.textContent = 'Enter a flag.'; msg.className = 'crackme-msg wrong'; return; }
+  if (!val) { msg.textContent = 'Enter the flag.'; msg.className = 'crackme-msg wrong'; return; }
   var h = await sha256(val);
   if (h === FLAG_HASH) {
     msg.textContent = 'Correct.';
     msg.className = 'crackme-msg correct';
-    setTimeout(function() {
-      closeCrackmeDialog();
-      var a = document.createElement('a');
-      a.href = './crackme.zip';
-      a.download = 'crackme.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }, 800);
   } else {
     msg.textContent = 'Wrong.';
     msg.className = 'crackme-msg wrong';
