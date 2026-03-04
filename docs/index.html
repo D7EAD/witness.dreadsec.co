@@ -130,11 +130,18 @@ main {
   z-index: 1000;
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: clamp(0.8rem, 2.5vw, 2rem);
   padding: 0.7rem 1rem;
   background: rgba(5, 2, 8, 0.7);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
+}
+
+.toolbar-links {
+  display: flex;
+  justify-content: center;
+  gap: clamp(0.8rem, 2.5vw, 2rem);
 }
 
 .toolbar a {
@@ -152,6 +159,35 @@ main {
 .toolbar a:hover {
   color: var(--text-light);
   border-bottom-color: var(--red);
+}
+
+.toolbar-brand {
+  display: none;
+  font-family: 'Michroma', sans-serif;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.hamburger {
+  display: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 1.3rem;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+  font-family: 'Share Tech Mono', monospace;
+  line-height: 1;
+  transition: color 0.2s, border-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hamburger:hover, .hamburger.active {
+  color: var(--red);
+  border-color: var(--red);
 }
 
 .hero {
@@ -184,8 +220,8 @@ main {
 
 .hero-title {
   font-family: 'Michroma', sans-serif;
-  font-size: clamp(2.5rem, 9vw, 7.5rem);
-  letter-spacing: 0.25em;
+  font-size: clamp(2.2rem, 9vw, 7.5rem);
+  letter-spacing: clamp(0.08em, 2vw, 0.25em);
   color: var(--text-light);
   position: relative;
   display: inline-block;
@@ -246,11 +282,12 @@ main {
 
 .hero-subtitle {
   font-family: 'Share Tech Mono', monospace;
-  font-size: clamp(0.7rem, 1.4vw, 0.95rem);
+  font-size: clamp(0.6rem, 1.4vw, 0.95rem);
   color: var(--text-dim);
-  letter-spacing: 0.35em;
+  letter-spacing: clamp(0.1em, 2vw, 0.35em);
   text-transform: uppercase;
   margin-top: 1rem;
+  padding: 0 1rem;
 }
 
 section { padding: clamp(1.5rem, 4vh, 3rem) 0; }
@@ -270,15 +307,16 @@ section { padding: clamp(1.5rem, 4vh, 3rem) 0; }
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid var(--border);
   border-left: 3px solid var(--red);
-  padding: 1.4rem 1.8rem;
+  padding: clamp(0.8rem, 3vw, 1.4rem) clamp(1rem, 3vw, 1.8rem);
   font-family: 'Share Tech Mono', monospace;
-  font-size: clamp(0.72rem, 0.95vw, 0.88rem);
+  font-size: clamp(0.65rem, 0.95vw, 0.88rem);
   color: #b0a2c0;
   line-height: 1.7;
   overflow-x: auto;
   max-width: 480px;
   margin: 0 auto;
   white-space: pre;
+  -webkit-overflow-scrolling: touch;
 }
 
 .footnote {
@@ -423,14 +461,16 @@ section { padding: clamp(1.5rem, 4vh, 3rem) 0; }
 .crackme-btn {
   display: inline-block;
   font-family: 'Michroma', sans-serif;
-  font-size: clamp(0.75rem, 1.2vw, 0.95rem);
+  font-size: clamp(0.65rem, 1.2vw, 0.95rem);
   letter-spacing: 0.2em;
   color: var(--red);
   border: 1px solid var(--red);
-  padding: 0.9rem 2.5rem;
+  padding: clamp(0.7rem, 2vw, 0.9rem) clamp(1.2rem, 4vw, 2.5rem);
   text-decoration: none;
   transition: background 0.3s, box-shadow 0.3s, color 0.3s;
   text-transform: uppercase;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .crackme-overlay {
@@ -525,6 +565,14 @@ section { padding: clamp(1.5rem, 4vh, 3rem) 0; }
 .crackme-msg.wrong { color: var(--red); }
 .crackme-msg.correct { color: #2ecc40; }
 
+.crackme-row {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .crackme-disabled {
   opacity: 0.25;
   pointer-events: none;
@@ -562,6 +610,68 @@ footer {
 @media (max-width: 640px) {
   .stats-strip { flex-direction: column; gap: 1.5rem; }
 }
+
+/* ---- Mobile nav ---- */
+@media (max-width: 680px) {
+  .hamburger { display: block; position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); }
+  .toolbar-brand { display: block; }
+  .toolbar { justify-content: flex-start; padding-left: 1.2rem; }
+  .toolbar-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    background: rgba(5, 2, 8, 0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0;
+    gap: 0;
+  }
+  .toolbar-links.open { display: flex; }
+  .toolbar-links a {
+    padding: 0.85rem 1.5rem;
+    font-size: 0.72rem;
+    border-bottom: none;
+    border-left: 2px solid transparent;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+  .toolbar-links a:hover, .toolbar-links a:active {
+    background: rgba(224, 26, 43, 0.06);
+    border-left-color: var(--red);
+    color: var(--text-light);
+  }
+}
+
+/* ---- Mobile general ---- */
+@media (max-width: 480px) {
+  .hero { min-height: 90vh; min-height: 90dvh; }
+  .hero-title { word-break: break-word; }
+  .cta-quote { letter-spacing: 0.02em; }
+  .about-text { max-width: 100%; padding: 0 0.25rem; }
+  .annot-card { padding: 1rem; }
+  .annot-name { font-size: 0.72rem; }
+  .crackme-dialog-btns button { font-size: 0.65rem; padding: 0.7rem 0.6rem; min-height: 44px; }
+}
+
+/* ---- CTA buttons stack on narrow screens ---- */
+@media (max-width: 520px) {
+  .cta-section .crackme-btn { display: block; width: 100%; max-width: 280px; margin: 0 auto; text-align: center; }
+  .crackme-row { flex-direction: column; align-items: center; }
+}
+
+/* ---- Disable custom cursor on touch devices ---- */
+@media (hover: none), (pointer: coarse) {
+  * { cursor: auto !important; }
+}
+
+/* ---- Safe area insets for notched phones ---- */
+@supports (padding: env(safe-area-inset-bottom)) {
+  footer { padding-bottom: calc(2rem + env(safe-area-inset-bottom)); }
+  .toolbar { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+}
 </style>
 </head>
 <body>
@@ -574,14 +684,18 @@ footer {
 <main>
 
 <nav class="toolbar" id="toolbar">
-  <a href="#hero">Witness</a>
-  <a href="#about">About</a>
-  <a href="#coverage">Coverage</a>
-  <a href="#annotations">Annotations</a>
-  <a href="#stats">Stats</a>
-  <a href="#impersonation">Impersonation</a>
-  <a href="#capabilities">Capabilities</a>
-  <a href="#crackme">Crack Me</a>
+  <a href="#hero" class="toolbar-brand">Witness</a>
+  <div class="toolbar-links" id="toolbar-links">
+    <a href="#hero">Witness</a>
+    <a href="#about">About</a>
+    <a href="#coverage">Coverage</a>
+    <a href="#annotations">Annotations</a>
+    <a href="#stats">Stats</a>
+    <a href="#impersonation">Impersonation</a>
+    <a href="#capabilities">Capabilities</a>
+    <a href="#crackme">Crack Me</a>
+  </div>
+  <button class="hamburger" id="hamburger" aria-label="Menu">&#9776;</button>
 </nav>
 
 <section class="hero" id="hero">
@@ -733,7 +847,7 @@ footer {
 
 <section class="cta-section reveal" id="crackme">
   <a href="./crackme-easy.exe" download class="crackme-btn" id="crackme-dl" onclick="showSubmitFlag()">Crack Me</a>
-  <div style="margin-top:1rem;display:flex;gap:1rem;justify-content:center;">
+  <div class="crackme-row">
     <a href="#" class="crackme-btn" id="submit-flag-btn" style="display:none;" onclick="openFlagDialog(event)">Submit Flag</a>
     <span class="crackme-btn crackme-disabled">Research</span>
     <span class="crackme-btn crackme-disabled">Download</span>
@@ -945,7 +1059,8 @@ var shapeFns = [drawHexagonShape, drawTriangleShape, drawCircleShape, drawDiamon
 
 function drawAllShapes() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  var count = Math.min(15, Math.max(6, Math.floor((canvas.width * canvas.height) / 160000)));
+  var maxShapes = (window.innerWidth < 600) ? 8 : 15;
+  var count = Math.min(maxShapes, Math.max(4, Math.floor((canvas.width * canvas.height) / 160000)));
   for (var i = 0; i < count; i++) {
     var x = Math.random() * canvas.width;
     var y = Math.random() * canvas.height;
@@ -1186,15 +1301,18 @@ eyeFrames.push(drawEyeCursor(0, 0.5));
 eyeFrames.push(drawEyeCursor(0, 0.15));
 eyeFrames.push(drawEyeCursor(0, 0));
 
+var isTouch = window.matchMedia('(hover: none)').matches || window.matchMedia('(pointer: coarse)').matches;
+
 var curStyleEl = document.createElement('style');
 curStyleEl.id = 'eye-cursor-style';
 document.head.appendChild(curStyleEl);
 
 function setEyeFrame(idx) {
+  if (isTouch) return;
   curStyleEl.textContent = '*{cursor:url("' + eyeFrames[idx] + '") 20 20, default !important;}';
 }
 
-setEyeFrame(2);
+if (!isTouch) setEyeFrame(2);
 
 var eyeState = 'idle';
 var eyeTimer = null;
@@ -1233,6 +1351,7 @@ function eyeBlink() {
 }
 
 function eyeAction() {
+  if (isTouch) return;
   if (Math.random() < 0.4) {
     eyeBlink();
   } else {
@@ -1241,7 +1360,29 @@ function eyeAction() {
   setTimeout(eyeAction, 2000 + Math.random() * 3000);
 }
 
-setTimeout(eyeAction, 1500 + Math.random() * 2000);
+if (!isTouch) setTimeout(eyeAction, 1500 + Math.random() * 2000);
+
+// Hamburger menu
+var hamburgerBtn = document.getElementById('hamburger');
+var toolbarLinks = document.getElementById('toolbar-links');
+hamburgerBtn.addEventListener('click', function() {
+  toolbarLinks.classList.toggle('open');
+  hamburgerBtn.classList.toggle('active');
+});
+// Close menu when a link is tapped
+toolbarLinks.addEventListener('click', function(e) {
+  if (e.target.tagName === 'A') {
+    toolbarLinks.classList.remove('open');
+    hamburgerBtn.classList.remove('active');
+  }
+});
+// Close menu on outside tap
+document.addEventListener('click', function(e) {
+  if (!toolbar.contains(e.target)) {
+    toolbarLinks.classList.remove('open');
+    hamburgerBtn.classList.remove('active');
+  }
+});
 
 var FLAG_HASH = '9c87ddc87b397bf5c1783597729fe4dc824dc447cede382ea76ec5e2ba98ef1f';
 function showSubmitFlag() {
