@@ -729,6 +729,20 @@ footer {
     <span class="cmt">// everything below is virtualized at compile-time</span>
     <span class="kw">return</span> x * x + 1;
 }</pre>
+    <p class="about-text" style="margin-top: 2.5rem;">
+      Annotations stack. Each one adds a layer that compounds
+      the cost of analysis.
+    </p>
+    <pre class="code-block"><span class="kw">__attribute__</span>((<span class="kw">annotate</span>(<span class="str">"witness"</span>),
+               <span class="kw">annotate</span>(<span class="str">"antisym"</span>),
+               <span class="kw">annotate</span>(<span class="str">"recursive"</span>),
+               <span class="kw">annotate</span>(<span class="str">"badstack"</span>),
+               <span class="kw">annotate</span>(<span class="str">"true_self_destruct"</span>)))
+<span class="tp">int</span> hardened_function(<span class="tp">int</span> x) {
+    <span class="cmt">// virtualized, nested in itself, anti-symbolic,</span>
+    <span class="cmt">// stack-spoofed, destroyed after first call</span>
+    <span class="kw">return</span> x * x + 1;
+}</pre>
   </div>
 </section>
 
