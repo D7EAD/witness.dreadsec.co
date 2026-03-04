@@ -433,6 +433,98 @@ section { padding: clamp(1.5rem, 4vh, 3rem) 0; }
   text-transform: uppercase;
 }
 
+.crackme-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 2, 8, 0.92);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+}
+.crackme-overlay.active { display: flex; }
+.crackme-dialog {
+  background: #0a0610;
+  border: 1px solid var(--red);
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(224, 26, 43, 0.15), 0 0 120px rgba(224, 26, 43, 0.05);
+}
+.crackme-dialog h3 {
+  font-family: 'Michroma', sans-serif;
+  font-size: clamp(0.7rem, 1.2vw, 0.9rem);
+  letter-spacing: 0.25em;
+  color: var(--red);
+  margin-bottom: 1.2rem;
+  text-transform: uppercase;
+}
+.crackme-dialog p {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+.crackme-dialog input {
+  width: 100%;
+  background: rgba(224, 26, 43, 0.04);
+  border: 1px solid rgba(224, 26, 43, 0.2);
+  color: var(--text-light);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.85rem;
+  padding: 0.7rem 1rem;
+  outline: none;
+  letter-spacing: 0.05em;
+  transition: border-color 0.3s;
+}
+.crackme-dialog input:focus {
+  border-color: var(--red);
+  box-shadow: 0 0 15px rgba(224, 26, 43, 0.1);
+}
+.crackme-dialog input::placeholder { color: var(--text-dim); opacity: 0.5; }
+.crackme-dialog-btns {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.crackme-dialog-btns button {
+  flex: 1;
+  font-family: 'Michroma', sans-serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  padding: 0.65rem 1rem;
+  border: 1px solid;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.crackme-submit {
+  background: rgba(224, 26, 43, 0.1);
+  border-color: var(--red) !important;
+  color: var(--red);
+}
+.crackme-submit:hover {
+  background: rgba(224, 26, 43, 0.2);
+  box-shadow: 0 0 20px rgba(224, 26, 43, 0.2);
+}
+.crackme-cancel {
+  background: transparent;
+  border-color: var(--text-dim) !important;
+  color: var(--text-dim);
+}
+.crackme-cancel:hover { border-color: var(--text) !important; color: var(--text); }
+.crackme-msg {
+  font-size: 0.7rem;
+  margin-top: 0.8rem;
+  min-height: 1.2em;
+  letter-spacing: 0.05em;
+  font-family: 'Share Tech Mono', monospace;
+}
+.crackme-msg.wrong { color: var(--red); }
+.crackme-msg.correct { color: #2ecc40; }
+
 .crackme-disabled {
   opacity: 0.25;
   pointer-events: none;
@@ -640,7 +732,7 @@ footer {
 </section>
 
 <section class="cta-section reveal" id="crackme">
-  <a href="./crackme-easy.exe" download class="crackme-btn">Crack Me</a>
+  <a href="#" class="crackme-btn" id="crackme-dl" onclick="openCrackmeDialog(event)">Crack Me</a>
   <div style="margin-top:1rem;display:flex;gap:1rem;justify-content:center;">
     <span class="crackme-btn crackme-disabled">Research</span>
     <span class="crackme-btn crackme-disabled">Download</span>
@@ -648,6 +740,19 @@ footer {
 </section>
 
 <footer>WITNESS<br><span style="font-size:0.5rem;opacity:0.5;">Chaos(1.0.0)</span></footer>
+
+<div class="crackme-overlay" id="crackme-overlay">
+  <div class="crackme-dialog">
+    <h3>Enter Flag</h3>
+    <p>Find the 16-character key.</p>
+    <input type="text" id="crackme-input" maxlength="64" placeholder="flag" autocomplete="off" spellcheck="false">
+    <div class="crackme-dialog-btns">
+      <button class="crackme-cancel" onclick="closeCrackmeDialog()">Cancel</button>
+      <button class="crackme-submit" id="crackme-submit" onclick="checkCrackmeFlag()">Submit</button>
+    </div>
+    <div class="crackme-msg" id="crackme-msg"></div>
+  </div>
+</div>
 
 </main>
 
@@ -1136,6 +1241,55 @@ function eyeAction() {
 }
 
 setTimeout(eyeAction, 1500 + Math.random() * 2000);
+
+var FLAG_HASH = '9c87ddc87b397bf5c1783597729fe4dc824dc447cede382ea76ec5e2ba98ef1f';
+function openCrackmeDialog(e) {
+  e.preventDefault();
+  document.getElementById('crackme-overlay').classList.add('active');
+  var inp = document.getElementById('crackme-input');
+  inp.value = '';
+  document.getElementById('crackme-msg').textContent = '';
+  document.getElementById('crackme-msg').className = 'crackme-msg';
+  setTimeout(function() { inp.focus(); }, 100);
+}
+function closeCrackmeDialog() {
+  document.getElementById('crackme-overlay').classList.remove('active');
+}
+async function sha256(s) {
+  var buf = new TextEncoder().encode(s);
+  var hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+async function checkCrackmeFlag() {
+  var inp = document.getElementById('crackme-input');
+  var msg = document.getElementById('crackme-msg');
+  var val = inp.value.trim();
+  if (!val) { msg.textContent = 'Enter a flag.'; msg.className = 'crackme-msg wrong'; return; }
+  var h = await sha256(val);
+  if (h === FLAG_HASH) {
+    msg.textContent = 'Correct.';
+    msg.className = 'crackme-msg correct';
+    setTimeout(function() {
+      closeCrackmeDialog();
+      var a = document.createElement('a');
+      a.href = './crackme.zip';
+      a.download = 'crackme.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, 800);
+  } else {
+    msg.textContent = 'Wrong.';
+    msg.className = 'crackme-msg wrong';
+    inp.select();
+  }
+}
+document.getElementById('crackme-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') checkCrackmeFlag();
+});
+document.getElementById('crackme-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeCrackmeDialog();
+});
 </script>
 </body>
 </html>
