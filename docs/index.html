@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Witness</title>
+<meta name="description" content="Exploiting LLVM for code protection. One annotation. Your function disappears.">
+<meta property="og:title" content="Witness">
+<meta property="og:description" content="Exploiting LLVM for code protection. One annotation. Your function disappears.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Witness">
+<meta name="twitter:description" content="Exploiting LLVM for code protection. One annotation. Your function disappears.">
+<meta name="theme-color" content="#050208">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Michroma&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #050208;
+  --bg-card: rgba(12, 6, 18, 0.65);
+  --red: #e01a2b;
+  --cyan: #1af0f0;
+  --text: #9088a0;
+  --text-light: #c4b8d4;
+  --text-dim: #5a4f6a;
+  --border: rgba(224, 26, 43, 0.12);
+  --border-hover: rgba(224, 26, 43, 0.45);
+  --glow: rgba(224, 26, 43, 0.15);
+}
+
+::selection { background: rgba(224, 26, 43, 0.3); color: var(--text-light); }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: rgba(224, 26, 43, 0.25); }
+::-webkit-scrollbar-thumb:hover { background: rgba(224, 26, 43, 0.5); }
+
+html { scroll-behavior: smooth; scroll-padding-top: 3rem; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Chakra Petch', sans-serif;
+  font-weight: 400;
+  line-height: 1.7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(5, 2, 8, 0.45) 100%);
+  z-index: 997;
+  pointer-events: none;
+}
+
+#bg-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#flash-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 1px,
+    rgba(0, 0, 0, 0.06) 1px,
+    rgba(0, 0, 0, 0.06) 2px
+  );
+}
+
+.grain {
+  position: fixed;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.04;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grainDrift 0.4s steps(3) infinite;
+}
+
+@keyframes grainDrift {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(-1.5%, -1%); }
+  66% { transform: translate(1%, 1.5%); }
+}
+
+main {
+  position: relative;
+  z-index: 1;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 4vw, 3rem);
+}
+
+.toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  gap: clamp(0.8rem, 2.5vw, 2rem);
+  padding: 0.7rem 1rem;
+  background: rgba(5, 2, 8, 0.7);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar a {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.6rem, 0.8vw, 0.72rem);
+  color: var(--text-dim);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.toolbar a:hover {
+  color: var(--text-light);
+  border-bottom-color: var(--red);
+}
+
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+}
+
+.hero-content {
+  will-change: transform, opacity;
+  animation: heroEnter 1.8s ease both;
+}
+
+@keyframes heroEnter {
+  from { opacity: 0; transform: translateY(35px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.logo {
+  display: block;
+  margin: 0 auto -0.2rem auto;
+  width: clamp(120px, 20vw, 220px);
+  height: auto;
+  mix-blend-mode: screen;
+  opacity: 0.92;
+}
+
+.hero-title {
+  font-family: 'Michroma', sans-serif;
+  font-size: clamp(2.5rem, 9vw, 7.5rem);
+  letter-spacing: 0.25em;
+  color: var(--text-light);
+  position: relative;
+  display: inline-block;
+  text-shadow: 0 0 60px var(--glow);
+}
+
+.hero-title::before,
+.hero-title::after {
+  content: 'WITNESS';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
+
+.hero-title::before {
+  color: var(--red);
+  clip-path: polygon(0 0, 100% 0, 100% 33%, 0 33%);
+  animation: glitchTop 2.5s infinite;
+  opacity: 0.8;
+}
+
+.hero-title::after {
+  color: var(--cyan);
+  clip-path: polygon(0 67%, 100% 67%, 100% 100%, 0 100%);
+  animation: glitchBottom 2.1s infinite;
+  opacity: 0.8;
+}
+
+@keyframes glitchTop {
+  0%, 74%, 100% { transform: translate(0) skewX(0); }
+  75% { transform: translate(-8px, -3px) skewX(-3deg); clip-path: polygon(0 0, 100% 0, 100% 55%, 0 55%); }
+  77% { transform: translate(12px, 2px) skewX(2deg); clip-path: polygon(0 10%, 100% 10%, 100% 40%, 0 40%); }
+  79% { transform: translate(-4px, 0) skewX(-1deg); }
+  81% { transform: translate(6px, -2px) skewX(4deg); clip-path: polygon(0 0, 100% 0, 100% 65%, 0 65%); }
+  83% { transform: translate(-10px, 3px) skewX(-2deg); clip-path: polygon(0 5%, 100% 5%, 100% 30%, 0 30%); }
+  85% { transform: translate(3px, -1px); clip-path: polygon(0 0, 100% 0, 100% 33%, 0 33%); }
+  87% { transform: translate(0) skewX(0); }
+  92% { transform: translate(-6px, 1px) skewX(-2deg); clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%); }
+  94% { transform: translate(9px, -2px) skewX(3deg); clip-path: polygon(0 15%, 100% 15%, 100% 45%, 0 45%); }
+  96% { transform: translate(-2px, 0) skewX(0); }
+}
+
+@keyframes glitchBottom {
+  0%, 72%, 100% { transform: translate(0) skewX(0); }
+  73% { transform: translate(10px, 3px) skewX(3deg); clip-path: polygon(0 45%, 100% 45%, 100% 100%, 0 100%); }
+  75% { transform: translate(-7px, -1px) skewX(-4deg); clip-path: polygon(0 60%, 100% 60%, 100% 85%, 0 85%); }
+  77% { transform: translate(5px, 2px) skewX(1deg); }
+  79% { transform: translate(-12px, -3px) skewX(-3deg); clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); }
+  81% { transform: translate(8px, 0) skewX(2deg); clip-path: polygon(0 70%, 100% 70%, 100% 90%, 0 90%); }
+  83% { transform: translate(-3px, 1px); clip-path: polygon(0 67%, 100% 67%, 100% 100%, 0 100%); }
+  85% { transform: translate(0) skewX(0); }
+  90% { transform: translate(7px, -2px) skewX(2deg); clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%); }
+  92% { transform: translate(-9px, 3px) skewX(-3deg); clip-path: polygon(0 65%, 100% 65%, 100% 80%, 0 80%); }
+  94% { transform: translate(4px, 0) skewX(0); }
+}
+
+.hero-subtitle {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.7rem, 1.4vw, 0.95rem);
+  color: var(--text-dim);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  margin-top: 1rem;
+}
+
+section { padding: clamp(1.5rem, 4vh, 3rem) 0; }
+
+.about-text {
+  font-size: clamp(0.92rem, 1.2vw, 1.08rem);
+  color: var(--text);
+  max-width: 550px;
+  line-height: 1.85;
+  margin-bottom: 2.5rem;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.code-block {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
+  padding: 1.4rem 1.8rem;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.72rem, 0.95vw, 0.88rem);
+  color: #b0a2c0;
+  line-height: 1.7;
+  overflow-x: auto;
+  max-width: 480px;
+  margin: 0 auto;
+  white-space: pre;
+}
+
+.footnote {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.58rem, 0.7vw, 0.65rem);
+  color: var(--text-dim);
+  opacity: 0.7;
+  margin-top: 0.8rem;
+  text-align: center;
+}
+
+.code-block .kw { color: var(--red); }
+.code-block .str { color: var(--cyan); }
+.code-block .cmt { color: var(--text-dim); }
+.code-block .tp { color: #c08a38; }
+
+.stats-strip {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: clamp(2rem, 5vw, 4rem);
+  padding: clamp(2rem, 5vh, 3.5rem) clamp(1rem, 4vw, 3rem);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: rgba(224, 26, 43, 0.02);
+}
+
+.stat-item { text-align: center; min-width: 110px; }
+
+.stat-value {
+  font-family: 'Michroma', sans-serif;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  color: var(--red);
+  line-height: 1;
+  text-shadow: 0 0 25px var(--glow);
+}
+
+.stat-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.58rem, 0.75vw, 0.72rem);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-top: 0.6rem;
+}
+
+.annot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.annot-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--red);
+  padding: 1.2rem 1.3rem;
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.annot-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 0 25px var(--glow);
+}
+
+.annot-name {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.68rem, 0.85vw, 0.78rem);
+  display: block;
+  margin-bottom: 0.6rem;
+}
+
+.annot-desc {
+  font-size: clamp(0.72rem, 0.82vw, 0.78rem);
+  color: var(--text-dim);
+  line-height: 1.55;
+  font-weight: 300;
+  flex: 1;
+}
+
+.annot-note {
+  display: block;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.52rem, 0.62vw, 0.58rem);
+  color: var(--text-dim);
+  opacity: 0.5;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .annot-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .annot-grid { grid-template-columns: 1fr; }
+}
+
+.tag-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.tag {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.62rem, 0.8vw, 0.72rem);
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgba(224, 26, 43, 0.1);
+  transition: border-color 0.3s, color 0.3s;
+}
+
+.tag:hover {
+  border-color: rgba(224, 26, 43, 0.35);
+  color: var(--text);
+}
+
+.cta-section {
+  text-align: center;
+  padding: clamp(2rem, 5vh, 4rem) clamp(1rem, 4vw, 3rem);
+}
+
+.cta-quote {
+  font-family: 'Michroma', sans-serif;
+  font-size: clamp(0.95rem, 2.2vw, 1.6rem);
+  color: var(--text-light);
+  letter-spacing: 0.06em;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 0 35px var(--glow);
+}
+
+.crackme-btn {
+  display: inline-block;
+  font-family: 'Michroma', sans-serif;
+  font-size: clamp(0.75rem, 1.2vw, 0.95rem);
+  letter-spacing: 0.2em;
+  color: var(--red);
+  border: 1px solid var(--red);
+  padding: 0.9rem 2.5rem;
+  text-decoration: none;
+  transition: background 0.3s, box-shadow 0.3s, color 0.3s;
+  text-transform: uppercase;
+}
+
+.crackme-disabled {
+  opacity: 0.25;
+  pointer-events: none;
+  border-style: dashed;
+}
+
+.crackme-btn:hover {
+  background: rgba(224, 26, 43, 0.12);
+  box-shadow: 0 0 30px rgba(224, 26, 43, 0.25), inset 0 0 30px rgba(224, 26, 43, 0.06);
+  color: var(--text-light);
+}
+
+footer {
+  text-align: center;
+  padding: 2rem;
+  border-top: 1px solid var(--border);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+  .stats-strip { flex-direction: column; gap: 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<canvas id="flash-canvas"></canvas>
+<div class="scanlines"></div>
+<div class="grain"></div>
+
+<main>
+
+<nav class="toolbar" id="toolbar">
+  <a href="#hero">Witness</a>
+  <a href="#about">About</a>
+  <a href="#coverage">Coverage</a>
+  <a href="#annotations">Annotations</a>
+  <a href="#stats">Stats</a>
+  <a href="#impersonation">Impersonation</a>
+  <a href="#capabilities">Capabilities</a>
+  <a href="#crackme">Crack Me</a>
+</nav>
+
+<section class="hero" id="hero">
+  <div class="hero-content">
+    <img src="witness-logo.png" alt="Witness" class="logo">
+    <h1 class="hero-title">WITNESS</h1>
+    <p class="hero-subtitle">Exploiting LLVM for Multi-Language Virtualization</p>
+  </div>
+</section>
+
+<section>
+  <div class="container reveal">
+    <p class="about-text">
+      We present <span style="color: var(--red)">Witness</span>, a tool that
+      exploits the full power of the compilation pipeline to virtualize, encrypt, and
+      entangle your code beyond recognition, producing a unique, irreversible*
+      binary on every build.
+    </p>
+    <p class="footnote">* Nothing is truly irreversible. Witness aims to make it exceptionally difficult.</p>
+  </div>
+</section>
+
+<section class="about" id="about">
+  <div class="container reveal">
+    <p class="about-text">
+      One annotation. Your function disappears. What remains cannot be read,
+      cannot be reproduced, and will never be the same twice.
+    </p>
+    <pre class="code-block"><span class="kw">__attribute__</span>((<span class="kw">annotate</span>(<span class="str">"witness"</span>)))
+<span class="tp">int</span> protected_function(<span class="tp">int</span> x) {
+    <span class="cmt">// everything below is virtualized at compile-time</span>
+    <span class="kw">return</span> x * x + 1;
+}</pre>
+  </div>
+</section>
+
+
+<section id="coverage">
+  <div class="container reveal">
+    <p class="about-text">
+      Witness operates on LLVM IR, the intermediate representation every compiled
+      function passes through before becoming machine code. By virtualizing at this level,
+      full x86-64 coverage is achieved automatically: every instruction the compiler can
+      generate is already captured before it exists.
+    </p>
+  </div>
+</section>
+
+<section id="annotations">
+  <div class="container reveal">
+    <div class="annot-grid">
+      <div class="annot-card">
+        <code class="annot-name"><span class="kw">annotate</span>(<span class="str">"witness"</span>)</code>
+        <p class="annot-desc">Virtualize the function. Code becomes encrypted bytecode executed by an embedded VM.</p>
+      </div>
+      <div class="annot-card">
+        <code class="annot-name"><span class="kw">annotate</span>(<span class="str">"antisym"</span>)</code>
+        <p class="annot-desc">Inject anti-symbolic execution traps. Poisons constraint solvers and automated analysis.</p>
+        <span class="annot-note">falls under witness</span>
+      </div>
+      <div class="annot-card">
+        <code class="annot-name"><span class="kw">annotate</span>(<span class="str">"recursive"</span>)</code>
+        <p class="annot-desc">Virtualize the virtualizer. Nest the VM inside itself for layered protection.</p>
+        <span class="annot-note">falls under witness</span>
+      </div>
+      <div class="annot-card">
+        <code class="annot-name"><span class="kw">annotate</span>(<span class="str">"badstack"</span>)</code>
+        <p class="annot-desc">Spoof the call stack at runtime. Debuggers and profilers see fabricated frames.</p>
+        <span class="annot-note">falls under witness</span>
+      </div>
+      <div class="annot-card">
+        <code class="annot-name"><span class="kw">annotate</span>(<span class="str">"soft_self_destruct"</span>)</code>
+        <p class="annot-desc">Erase bytecode after execution. An encrypted snapshot allows the function to be called again.</p>
+        <span class="annot-note">falls under witness</span>
+      </div>
+      <div class="annot-card">
+        <code class="annot-name"><span class="kw">annotate</span>(<span class="str">"true_self_destruct"</span>)</code>
+        <p class="annot-desc">Permanently destroy bytecode after first call. The function cannot execute again within the same process.</p>
+        <span class="annot-note">falls under witness</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="stats">
+  <div class="stats-strip reveal">
+    <div class="stat-item">
+      <div class="stat-value">&infin;</div>
+      <div class="stat-label">Unique Builds</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Plaintext at Rest</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Shared Structure</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">1</div>
+      <div class="stat-label">Line to Protect</div>
+    </div>
+  </div>
+</section>
+
+<section id="impersonation">
+  <div class="container reveal">
+    <p class="about-text">
+      Witness can mimic the signatures, structures, and behavioral fingerprints of other
+      virtualizers, packers, and obfuscators. Analysts waste time applying the wrong
+      toolchain. Automated classifiers report the wrong product. The real protection
+      remains unidentified.
+    </p>
+  </div>
+</section>
+
+<section id="capabilities">
+  <div class="container">
+    <div class="tag-strip reveal">
+      <span class="tag">C++ Exceptions</span>
+      <span class="tag">Variadic</span>
+      <span class="tag">SIMD</span>
+      <span class="tag">Atomics</span>
+      <span class="tag">Inline ASM</span>
+      <span class="tag">Kernel Mode</span>
+      <span class="tag">Licensing</span>
+      <span class="tag">Zero CRT</span>
+    </div>
+  </div>
+</section>
+
+<section id="languages">
+  <div class="container">
+    <div class="tag-strip reveal">
+      <span class="tag">C</span>
+      <span class="tag">C++</span>
+      <span class="tag" style="opacity:0.4;border-style:dashed;">Objective-C (untested)</span>
+      <span class="tag" style="opacity:0.4;border-style:dashed;">Fortran (untested)</span>
+      <span class="tag" style="opacity:0.4;border-style:dashed;">D (untested)</span>
+      <span class="tag" style="opacity:0.4;border-style:dashed;">Rust (soon)</span>
+    </div>
+    <p class="footnote">Any language that compiles through LLVM.</p>
+  </div>
+</section>
+
+<section class="cta-section reveal">
+  <p class="cta-quote">REFUSE TO BE READ</p>
+</section>
+
+<section class="cta-section reveal" id="crackme">
+  <a href="./crackme-easy.exe" download class="crackme-btn">Crack Me</a>
+  <div style="margin-top:1rem;display:flex;gap:1rem;justify-content:center;">
+    <span class="crackme-btn crackme-disabled">Research</span>
+    <span class="crackme-btn crackme-disabled">Download</span>
+  </div>
+</section>
+
+<footer>WITNESS<br><span style="font-size:0.5rem;opacity:0.5;">Chaos(1.0.0)</span></footer>
+
+</main>
+
+<script>
+var canvas = document.getElementById('bg-canvas');
+var ctx = canvas.getContext('2d');
+var flashCanvas = document.getElementById('flash-canvas');
+var fctx = flashCanvas.getContext('2d');
+
+function resizeCanvases() {
+  canvas.width = flashCanvas.width = window.innerWidth;
+  canvas.height = flashCanvas.height = window.innerHeight;
+  drawAllShapes();
+}
+
+function drawPolygon(cx, cy, r, sides, rot) {
+  ctx.beginPath();
+  for (var i = 0; i <= sides; i++) {
+    var a = rot + (i * Math.PI * 2) / sides;
+    var px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+}
+
+function drawHexagonShape(x, y, size, rotation, alpha, blur, lw) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.globalAlpha = alpha;
+  if (blur > 0.5) ctx.filter = 'blur(' + blur.toFixed(1) + 'px)';
+  ctx.strokeStyle = '#e01a2b';
+  ctx.shadowColor = '#e01a2b';
+  ctx.shadowBlur = 15 + size * 0.2;
+  ctx.lineWidth = lw;
+  drawPolygon(0, 0, size, 6, 0);
+  ctx.lineWidth = lw * 0.4;
+  drawPolygon(0, 0, size * 0.65, 6, Math.PI / 6);
+  ctx.lineWidth = lw * 0.25;
+  drawPolygon(0, 0, size * 0.35, 6, 0);
+  ctx.fillStyle = '#e01a2b';
+  for (var i = 0; i < 6; i++) {
+    var a = (i * Math.PI * 2) / 6;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * size, Math.sin(a) * size, 1 + size * 0.008, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.lineWidth = lw * 0.15;
+  for (var i = 0; i < 3; i++) {
+    var a = (i * Math.PI) / 3;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * size * 0.15, Math.sin(a) * size * 0.15);
+    ctx.lineTo(Math.cos(a) * size * 0.9, Math.sin(a) * size * 0.9);
+    ctx.moveTo(Math.cos(a + Math.PI) * size * 0.15, Math.sin(a + Math.PI) * size * 0.15);
+    ctx.lineTo(Math.cos(a + Math.PI) * size * 0.9, Math.sin(a + Math.PI) * size * 0.9);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTriangleShape(x, y, size, rotation, alpha, blur, lw) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.globalAlpha = alpha;
+  if (blur > 0.5) ctx.filter = 'blur(' + blur.toFixed(1) + 'px)';
+  ctx.strokeStyle = '#e01a2b';
+  ctx.shadowColor = '#e01a2b';
+  ctx.shadowBlur = 15 + size * 0.2;
+  ctx.lineWidth = lw;
+  drawPolygon(0, 0, size, 3, -Math.PI / 2);
+  ctx.lineWidth = lw * 0.4;
+  drawPolygon(0, 0, size * 0.55, 3, Math.PI / 6);
+  ctx.lineWidth = lw * 0.3;
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.42, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#e01a2b';
+  ctx.beginPath();
+  ctx.arc(0, 0, 1.2 + size * 0.008, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = lw * 0.15;
+  for (var i = 0; i < 3; i++) {
+    var a = -Math.PI / 2 + (i * Math.PI * 2) / 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * size * 0.85, Math.sin(a) * size * 0.85);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCircleShape(x, y, size, rotation, alpha, blur, lw) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha = alpha;
+  if (blur > 0.5) ctx.filter = 'blur(' + blur.toFixed(1) + 'px)';
+  ctx.strokeStyle = '#e01a2b';
+  ctx.shadowColor = '#e01a2b';
+  ctx.shadowBlur = 15 + size * 0.2;
+  ctx.lineWidth = lw;
+  ctx.beginPath(); ctx.arc(0, 0, size, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = lw * 0.5;
+  ctx.beginPath(); ctx.arc(0, 0, size * 0.7, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = lw * 0.3;
+  ctx.beginPath(); ctx.arc(0, 0, size * 0.4, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = lw * 0.2;
+  ctx.beginPath();
+  ctx.moveTo(-size, 0); ctx.lineTo(-size * 0.15, 0);
+  ctx.moveTo(size * 0.15, 0); ctx.lineTo(size, 0);
+  ctx.moveTo(0, -size); ctx.lineTo(0, -size * 0.15);
+  ctx.moveTo(0, size * 0.15); ctx.lineTo(0, size);
+  ctx.stroke();
+  ctx.lineWidth = lw * 0.15;
+  for (var i = 0; i < 12; i++) {
+    var a = (i * Math.PI * 2) / 12;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * size * 0.88, Math.sin(a) * size * 0.88);
+    ctx.lineTo(Math.cos(a) * size, Math.sin(a) * size);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#e01a2b';
+  ctx.beginPath(); ctx.arc(0, 0, 1.5 + size * 0.01, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawDiamondShape(x, y, size, rotation, alpha, blur, lw) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.globalAlpha = alpha;
+  if (blur > 0.5) ctx.filter = 'blur(' + blur.toFixed(1) + 'px)';
+  ctx.strokeStyle = '#e01a2b';
+  ctx.shadowColor = '#e01a2b';
+  ctx.shadowBlur = 15 + size * 0.2;
+  ctx.lineWidth = lw;
+  drawPolygon(0, 0, size, 4, 0);
+  ctx.lineWidth = lw * 0.35;
+  drawPolygon(0, 0, size * 0.55, 4, 0);
+  ctx.lineWidth = lw * 0.2;
+  ctx.beginPath();
+  ctx.moveTo(0, -size); ctx.lineTo(0, size);
+  ctx.moveTo(-size, 0); ctx.lineTo(size, 0);
+  ctx.stroke();
+  ctx.lineWidth = lw * 0.15;
+  for (var i = 0; i < 4; i++) {
+    var a = (i * Math.PI) / 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * size, Math.sin(a) * size);
+    ctx.lineTo(Math.cos(a) * size * 1.15, Math.sin(a) * size * 1.15);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSquareShape(x, y, size, rotation, alpha, blur, lw) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.globalAlpha = alpha;
+  if (blur > 0.5) ctx.filter = 'blur(' + blur.toFixed(1) + 'px)';
+  ctx.strokeStyle = '#e01a2b';
+  ctx.shadowColor = '#e01a2b';
+  ctx.shadowBlur = 15 + size * 0.2;
+  var s = size * 0.72;
+  ctx.lineWidth = lw;
+  ctx.strokeRect(-s, -s, s * 2, s * 2);
+  ctx.lineWidth = lw * 0.35;
+  var s2 = s * 0.55;
+  ctx.strokeRect(-s2, -s2, s2 * 2, s2 * 2);
+  ctx.lineWidth = lw * 0.25;
+  ctx.beginPath(); ctx.arc(0, 0, s * 0.85, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#e01a2b';
+  var corners = [[-s,-s],[s,-s],[s,s],[-s,s]];
+  for (var i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.arc(corners[i][0], corners[i][1], 1 + size * 0.007, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.lineWidth = lw * 0.15;
+  ctx.beginPath();
+  ctx.moveTo(-s2 * 0.5, 0); ctx.lineTo(s2 * 0.5, 0);
+  ctx.moveTo(0, -s2 * 0.5); ctx.lineTo(0, s2 * 0.5);
+  ctx.stroke();
+  ctx.restore();
+}
+
+var shapeFns = [drawHexagonShape, drawTriangleShape, drawCircleShape, drawDiamondShape, drawSquareShape];
+
+function drawAllShapes() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  var count = Math.min(15, Math.max(6, Math.floor((canvas.width * canvas.height) / 160000)));
+  for (var i = 0; i < count; i++) {
+    var x = Math.random() * canvas.width;
+    var y = Math.random() * canvas.height;
+    var size = 28 + Math.random() * 155;
+    var rotation = Math.random() * Math.PI * 2;
+    var alpha = 0.25 + Math.random() * 0.35;
+    var blur = Math.random() < 0.35 ? 0 : 2 + Math.random() * 13;
+    var lw = 0.6 + Math.random() * 1.0;
+    shapeFns[Math.floor(Math.random() * shapeFns.length)](x, y, size, rotation, alpha, blur, lw);
+  }
+}
+
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+
+var flashY = -1, flashAlpha = 0;
+
+function flashLoop() {
+  fctx.clearRect(0, 0, flashCanvas.width, flashCanvas.height);
+
+  if (Math.random() < 0.012) {
+    flashY = Math.random() * flashCanvas.height;
+    flashAlpha = 0.25 + Math.random() * 0.35;
+  }
+  if (flashAlpha > 0) {
+    fctx.save();
+    fctx.globalAlpha = flashAlpha;
+    fctx.strokeStyle = '#e01a2b';
+    fctx.lineWidth = 1 + Math.random() * 3;
+    fctx.shadowColor = '#e01a2b';
+    fctx.shadowBlur = 12;
+    fctx.beginPath();
+    fctx.moveTo(0, flashY);
+    fctx.lineTo(flashCanvas.width, flashY);
+    fctx.stroke();
+    fctx.restore();
+    flashAlpha -= 0.015;
+  }
+
+  requestAnimationFrame(flashLoop);
+}
+flashLoop();
+
+
+var heroContent = document.querySelector('.hero-content');
+var toolbar = document.getElementById('toolbar');
+window.addEventListener('scroll', function() {
+  var s = window.scrollY;
+  if (heroContent) {
+    heroContent.style.transform = 'translateY(' + (s * 0.35) + 'px)';
+    heroContent.style.opacity = Math.max(0, 1 - s / 500);
+  }
+}, { passive: true });
+
+
+var revealObs = new IntersectionObserver(function(entries) {
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].isIntersecting) entries[i].target.classList.add('revealed');
+  }
+}, { threshold: 0.07, rootMargin: '0px 0px -30px 0px' });
+
+var revealEls = document.querySelectorAll('.reveal');
+for (var ri = 0; ri < revealEls.length; ri++) revealObs.observe(revealEls[ri]);
+
+
+var allTags = document.querySelectorAll('.tag');
+
+function jitterTag() {
+  if (allTags.length === 0) return;
+  var tag = allTags[Math.floor(Math.random() * allTags.length)];
+  var jx = (Math.random() - 0.5) * 5;
+  tag.style.transition = 'transform 0.04s';
+  tag.style.transform = 'translateX(' + jx + 'px)';
+  setTimeout(function() {
+    tag.style.transition = 'transform 0.2s ease, border-color 0.3s, color 0.3s';
+    tag.style.transform = '';
+  }, 80 + Math.random() * 70);
+}
+
+setInterval(jitterTag, 2800 + Math.random() * 2000);
+
+
+var titleEl = document.querySelector('.hero-title');
+var titleOriginal = 'WITNESS';
+var glitchChars = '&#$@!%^*<>{}[]|/\\~`0123456789XZQW';
+
+function titleGlitch() {
+  if (!titleEl) return;
+  var burstLen = 2 + Math.floor(Math.random() * 4);
+  var step = 0;
+
+  function scrambleStep() {
+    if (step >= burstLen) {
+      titleEl.textContent = titleOriginal;
+      return;
+    }
+    var corrupted = '';
+    for (var i = 0; i < titleOriginal.length; i++) {
+      if (Math.random() < 0.4) {
+        corrupted += glitchChars[Math.floor(Math.random() * glitchChars.length)];
+      } else {
+        corrupted += titleOriginal[i];
+      }
+    }
+    titleEl.textContent = corrupted;
+    step++;
+    setTimeout(scrambleStep, 40 + Math.random() * 30);
+  }
+
+  scrambleStep();
+}
+
+setInterval(titleGlitch, 3000 + Math.random() * 4000);
+
+
+function drawEyeCursor(pupilOx, openness) {
+  var c = document.createElement('canvas');
+  c.width = 40; c.height = 40;
+  var g = c.getContext('2d');
+  var ex = 20, ey = 20;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+
+  var topY = 6 + (1 - openness) * 14;
+  var botY = 34 - (1 - openness) * 14;
+
+  g.shadowColor = '#e01a2b';
+  g.shadowBlur = 4;
+  g.strokeStyle = '#e01a2b';
+  g.lineWidth = 1.5;
+  g.beginPath();
+  g.moveTo(2, ey);
+  g.bezierCurveTo(8, topY, 32, topY, 38, ey);
+  g.bezierCurveTo(32, botY, 8, botY, 2, ey);
+  g.closePath();
+  g.stroke();
+
+  g.shadowBlur = 0;
+  g.strokeStyle = 'rgba(224,26,43,0.3)';
+  g.lineWidth = 0.6;
+  g.beginPath();
+  g.moveTo(5, ey);
+  g.bezierCurveTo(10, topY + 3, 30, topY + 3, 35, ey);
+  g.bezierCurveTo(30, botY - 3, 10, botY - 3, 5, ey);
+  g.closePath();
+  g.stroke();
+
+  if (openness > 0.15) {
+    g.save();
+    g.beginPath();
+    g.moveTo(2, ey);
+    g.bezierCurveTo(8, topY, 32, topY, 38, ey);
+    g.bezierCurveTo(32, botY, 8, botY, 2, ey);
+    g.closePath();
+    g.clip();
+
+    var px = ex + pupilOx;
+
+    g.shadowBlur = 5;
+    g.shadowColor = '#e01a2b';
+    g.strokeStyle = '#e01a2b';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.arc(px, ey, 7.5, 0, Math.PI * 2);
+    g.stroke();
+
+    g.shadowBlur = 0;
+    g.strokeStyle = 'rgba(224,26,43,0.5)';
+    g.lineWidth = 0.5;
+    g.beginPath();
+    g.arc(px, ey, 5.5, 0, Math.PI * 2);
+    g.stroke();
+
+    g.strokeStyle = 'rgba(224,26,43,0.25)';
+    g.lineWidth = 0.4;
+    for (var ri = 0; ri < 12; ri++) {
+      var ra = (ri * Math.PI * 2) / 12;
+      g.beginPath();
+      g.moveTo(px + Math.cos(ra) * 4, ey + Math.sin(ra) * 4);
+      g.lineTo(px + Math.cos(ra) * 7, ey + Math.sin(ra) * 7);
+      g.stroke();
+    }
+
+    g.fillStyle = '#e01a2b';
+    g.beginPath();
+    g.arc(px, ey, 3.2, 0, Math.PI * 2);
+    g.fill();
+
+    g.fillStyle = '#050208';
+    g.beginPath();
+    g.arc(px, ey, 1.5, 0, Math.PI * 2);
+    g.fill();
+
+    g.fillStyle = 'rgba(255,200,200,0.6)';
+    g.beginPath();
+    g.arc(px - 2.5, ey - 2.5, 1.2, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(255,200,200,0.3)';
+    g.beginPath();
+    g.arc(px + 2, ey + 1.5, 0.6, 0, Math.PI * 2);
+    g.fill();
+
+    g.restore();
+  }
+
+  g.strokeStyle = '#e01a2b';
+  g.lineWidth = 1;
+  g.beginPath();
+  g.moveTo(0, ey); g.lineTo(2, ey);
+  g.moveTo(38, ey); g.lineTo(40, ey);
+  g.stroke();
+
+  g.strokeStyle = 'rgba(224,26,43,0.4)';
+  g.lineWidth = 0.7;
+  var lashTop = topY;
+  g.beginPath();
+  g.moveTo(12, lashTop + 3); g.lineTo(11, lashTop - 1);
+  g.moveTo(17, lashTop + 1); g.lineTo(16, lashTop - 3);
+  g.moveTo(23, lashTop + 1); g.lineTo(24, lashTop - 3);
+  g.moveTo(28, lashTop + 3); g.lineTo(29, lashTop - 1);
+  g.stroke();
+
+  g.beginPath();
+  g.moveTo(13, botY - 1); g.lineTo(12, botY + 3);
+  g.moveTo(20, botY + 1); g.lineTo(20, botY + 4);
+  g.moveTo(27, botY - 1); g.lineTo(28, botY + 3);
+  g.stroke();
+
+  return c.toDataURL();
+}
+
+var eyeFrames = [];
+var pupilPositions = [-5, -3, 0, 3, 5];
+for (var ei = 0; ei < pupilPositions.length; ei++) {
+  eyeFrames.push(drawEyeCursor(pupilPositions[ei], 1));
+}
+eyeFrames.push(drawEyeCursor(0, 0.5));
+eyeFrames.push(drawEyeCursor(0, 0.15));
+eyeFrames.push(drawEyeCursor(0, 0));
+
+var curStyleEl = document.createElement('style');
+curStyleEl.id = 'eye-cursor-style';
+document.head.appendChild(curStyleEl);
+
+function setEyeFrame(idx) {
+  curStyleEl.textContent = '*{cursor:url("' + eyeFrames[idx] + '") 20 20, default !important;}';
+}
+
+setEyeFrame(2);
+
+var eyeState = 'idle';
+var eyeTimer = null;
+
+function eyeLook() {
+  if (eyeState !== 'idle') return;
+  eyeState = 'looking';
+  var dir = Math.random() < 0.5 ? (Math.random() < 0.5 ? 0 : 1) : (Math.random() < 0.5 ? 3 : 4);
+  setEyeFrame(dir);
+  setTimeout(function() {
+    setEyeFrame(2);
+    eyeState = 'idle';
+  }, 400 + Math.random() * 600);
+}
+
+function eyeBlink() {
+  if (eyeState !== 'idle') return;
+  eyeState = 'blinking';
+  setEyeFrame(5);
+  setTimeout(function() {
+    setEyeFrame(6);
+    setTimeout(function() {
+      setEyeFrame(7);
+      setTimeout(function() {
+        setEyeFrame(6);
+        setTimeout(function() {
+          setEyeFrame(5);
+          setTimeout(function() {
+            setEyeFrame(2);
+            eyeState = 'idle';
+          }, 40);
+        }, 40);
+      }, 80 + Math.random() * 40);
+    }, 35);
+  }, 35);
+}
+
+function eyeAction() {
+  if (Math.random() < 0.4) {
+    eyeBlink();
+  } else {
+    eyeLook();
+  }
+  setTimeout(eyeAction, 2000 + Math.random() * 3000);
+}
+
+setTimeout(eyeAction, 1500 + Math.random() * 2000);
+</script>
+</body>
+</html>
