@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Witness: Standalone</title>
+<meta name="description" content="Self-contained binary protection through code virtualization, bytecode encryption, and handler diversification.">
+<meta name="theme-color" content="#060a11">
+<meta property="og:title" content="Witness: Standalone">
+<meta property="og:description" content="Self-contained binary protection through code virtualization, bytecode encryption, and handler diversification.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="../witness-logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Witness: Standalone">
+<meta name="twitter:description" content="Self-contained binary protection through code virtualization, bytecode encryption, and handler diversification.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a11;
+    --surface: #0c1219;
+    --surface2: #111a25;
+    --surface3: #162030;
+    --border: #1a2538;
+    --border-l: #243348;
+    --accent: #4e8eff;
+    --accent-dim: rgba(78,142,255,.08);
+    --violet: #9775fa;
+    --violet-dim: rgba(151,117,250,.08);
+    --emerald: #34d399;
+    --emerald-dim: rgba(52,211,153,.06);
+    --rose: #f472b6;
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,.06);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,.06);
+    --text: #c9d1d9;
+    --text-bright: #e6edf3;
+    --muted: #5a6a7e;
+    --dim: #3d4f63;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  #plexus {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 0; pointer-events: none;
+  }
+
+  .page { max-width: 960px; margin: 0 auto; padding: 0 28px; }
+  .nav-bar {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+    margin-bottom: 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-brand { font-weight: 600; font-size: 14px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .nav-brand img { height: 20px; width: auto; }
+  .nav-parts { display: flex; gap: 4px; }
+  .nav-part {
+    font-size: 11.5px; padding: 6px 14px; border-radius: 6px; color: var(--muted);
+    text-decoration: none; font-weight: 500; transition: all 0.2s;
+  }
+  .nav-part:hover { color: var(--text); background: var(--surface2); }
+  .nav-part.active { color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(78,142,255,.15); }
+  .nav-home { border-right: 1px solid var(--border); margin-right: 4px; padding-right: 16px; }
+  .arch-disclaimer {
+    font-size: 9.5px; font-family: 'JetBrains Mono', monospace;
+    color: var(--dim); letter-spacing: 0.5px; opacity: 0.5;
+    padding-top: 10px;
+  }
+  .hero {
+    padding: 80px 0 60px;
+    text-align: center;
+    position: relative;
+  }
+  .hero::after {
+    content: ''; position: absolute; bottom: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-l), transparent);
+  }
+  .hero-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--amber);
+    background: var(--amber-dim); border: 1px solid rgba(251,191,36,.12);
+    padding: 5px 16px; border-radius: 20px; margin-bottom: 24px;
+  }
+  h1 {
+    font-size: 40px; font-weight: 700; line-height: 1.15; letter-spacing: -0.5px;
+    color: var(--text-bright);
+    margin-bottom: 16px;
+  }
+  h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--red), var(--amber));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero-sub {
+    font-size: 16px; color: var(--muted); max-width: 560px; margin: 0 auto;
+    line-height: 1.7; font-weight: 300;
+  }
+  .section { padding: 56px 0; position: relative; }
+  .section + .section { border-top: 1px solid var(--border); }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+    color: var(--dim); letter-spacing: 1px; margin-bottom: 8px; display: block;
+  }
+  h2 {
+    font-size: 24px; font-weight: 600; color: var(--text-bright); margin-bottom: 10px;
+    letter-spacing: -0.3px;
+  }
+  .section-desc { font-size: 14px; color: var(--muted); max-width: 520px; margin-bottom: 36px; }
+  .onion {
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; position: relative; margin-bottom: 8px;
+  }
+  .onion-label {
+    position: absolute; top: -9px; left: 20px;
+    background: var(--bg); padding: 0 12px;
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .onion-desc {
+    font-size: 12px; color: var(--muted); margin-bottom: 14px; padding-top: 6px;
+  }
+  .onion.l1 { border-color: rgba(251,191,36,.15); background: rgba(251,191,36,.02); }
+  .onion.l1 .onion-label { color: var(--amber); }
+  .onion.l2 { border-color: rgba(248,113,113,.12); background: rgba(248,113,113,.02); }
+  .onion.l2 .onion-label { color: var(--red); }
+  .onion.l3 { border-color: rgba(78,142,255,.12); background: rgba(78,142,255,.02); }
+  .onion.l3 .onion-label { color: var(--accent); }
+  .onion.l4 { border-color: rgba(151,117,250,.12); background: rgba(151,117,250,.03);
+    text-align: center; padding: 18px;
+  }
+  .onion.l4 .onion-label { color: var(--violet); }
+  .onion-core {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--violet); font-weight: 500;
+  }
+  .onion-note {
+    font-size: 11px; color: var(--dim); text-align: center; margin-top: 6px;
+    font-style: italic;
+  }
+  .pipeline { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+  .pipe-stage {
+    flex: 1; min-width: 120px; text-align: center;
+    padding: 18px 12px; background: var(--surface);
+    border: 1px solid var(--border); position: relative;
+  }
+  .pipe-stage:first-child { border-radius: 10px 0 0 10px; }
+  .pipe-stage:last-child { border-radius: 0 10px 10px 0; }
+  .pipe-stage + .pipe-stage { border-left: none; }
+  .pipe-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--dim); letter-spacing: 1px; margin-bottom: 6px;
+  }
+  .pipe-title { font-size: 12px; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; }
+  .pipe-desc { font-size: 10.5px; color: var(--muted); line-height: 1.45; }
+  .pipe-arrow {
+    position: absolute; right: -7px; top: 50%; transform: translateY(-50%);
+    z-index: 2; width: 13px; height: 13px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 8px; color: var(--amber);
+  }
+  .pipe-stage:last-child .pipe-arrow { display: none; }
+  .pipe-stage.active { border-color: rgba(251,191,36,.2); background: rgba(251,191,36,.03); }
+  .flow { max-width: 480px; margin: 0 auto; position: relative; }
+  .flow-phase {
+    text-align: center; margin: 20px 0 10px;
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .flow-phase.fp-init { color: var(--amber); }
+  .flow-phase.fp-exec { color: var(--red); }
+  .flow-phase.fp-exit { color: var(--emerald); }
+
+  .flow-node {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px; position: relative;
+  }
+  .flow-node .fn-title { font-size: 12px; font-weight: 600; color: var(--text-bright); margin-bottom: 3px; }
+  .flow-node .fn-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .flow-node.n-amber { border-color: rgba(251,191,36,.15); }
+  .flow-node.n-amber .fn-title { color: var(--amber); }
+  .flow-node.n-red { border-color: rgba(248,113,113,.15); }
+  .flow-node.n-red .fn-title { color: var(--red); }
+  .flow-node.n-blue { border-color: rgba(78,142,255,.15); }
+  .flow-node.n-blue .fn-title { color: var(--accent); }
+  .flow-node.n-violet { border-color: rgba(151,117,250,.15); }
+  .flow-node.n-violet .fn-title { color: var(--violet); }
+  .flow-node.n-emerald { border-color: rgba(52,211,153,.15); }
+  .flow-node.n-emerald .fn-title { color: var(--emerald); }
+  .flow-node.n-rose { border-color: rgba(244,114,182,.15); }
+  .flow-node.n-rose .fn-title { color: var(--rose); }
+
+  .flow-conn {
+    width: 2px; height: 20px; margin: 0 auto;
+    background: linear-gradient(to bottom, var(--border-l), var(--border));
+  }
+
+  .flow-feed {
+    display: block; text-align: right; margin-top: 8px;
+    font-size: 9.5px; color: var(--dim); font-style: italic;
+    letter-spacing: 0.3px;
+  }
+  .flow-feed::before {
+    content: '\2014\00a0';
+  }
+
+  .flow-loop {
+    border: 1px dashed var(--border-l); border-radius: 12px;
+    padding: 16px 14px; margin: 6px 0; position: relative;
+  }
+  .flow-loop-label {
+    position: absolute; top: -8px; left: 18px;
+    background: var(--bg); padding: 0 10px;
+    font-size: 9.5px; font-weight: 600; color: var(--amber);
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .flow-loop .flow-loop { margin-left: 10px; margin-right: 10px; }
+  .flow-loop .flow-loop .flow-loop-label { color: var(--red); }
+
+  .flow-branch {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    gap: 8px; align-items: center; margin: 6px 0;
+  }
+  .flow-branch-line { height: 1px; background: var(--border); }
+  .flow-branch-text {
+    font-size: 9px; font-weight: 600; color: var(--dim);
+    letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+  }
+  .layers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .layers-grid { grid-template-columns: 1fr; } }
+  .layer-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px;
+    transition: border-color 0.25s, background 0.25s;
+  }
+  .layer-card:hover { border-color: var(--border-l); background: var(--surface2); }
+  .layer-card.wide { grid-column: 1 / -1; }
+  .layer-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px; font-size: 16px;
+  }
+  .layer-icon.ic-vm { background: rgba(251,191,36,.08); color: var(--amber); border: 1px solid rgba(251,191,36,.12); }
+  .layer-icon.ic-enc { background: rgba(248,113,113,.08); color: var(--red); border: 1px solid rgba(248,113,113,.12); }
+  .layer-icon.ic-sym { background: rgba(151,117,250,.08); color: var(--violet); border: 1px solid rgba(151,117,250,.12); }
+  .layer-icon.ic-div { background: rgba(78,142,255,.08); color: var(--accent); border: 1px solid rgba(78,142,255,.12); }
+  .layer-icon.ic-val { background: rgba(244,114,182,.08); color: var(--rose); border: 1px solid rgba(244,114,182,.12); }
+  .layer-icon.ic-int { background: rgba(52,211,153,.08); color: var(--emerald); border: 1px solid rgba(52,211,153,.12); }
+  .layer-icon.ic-sec { background: rgba(248,113,113,.08); color: var(--red); border: 1px solid rgba(248,113,113,.12); }
+  .layer-icon.ic-tam { background: rgba(251,191,36,.08); color: var(--amber); border: 1px solid rgba(251,191,36,.12); }
+  .layer-title { font-size: 15px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .layer-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .layer-tags { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .layer-tag {
+    font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 4px;
+    background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--dim);
+  }
+  .attack-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+  @media (max-width: 700px) { .attack-grid { grid-template-columns: 1fr; } }
+  .attack-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; position: relative; overflow: hidden;
+  }
+  .attack-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .attack-card.fail::before { background: var(--red); opacity: 0.5; }
+  .attack-card.partial::before { background: var(--amber); opacity: 0.5; }
+  .attack-scenario { font-size: 12px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .attack-has { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
+  .attack-has strong { color: var(--text); font-weight: 500; }
+  .attack-result {
+    font-size: 11.5px; font-weight: 600; padding: 5px 10px;
+    border-radius: 5px; display: inline-block;
+  }
+  .attack-result.blocked { background: rgba(248,113,113,.1); color: var(--red); border: 1px solid rgba(248,113,113,.12); }
+  .attack-result.degraded { background: rgba(251,191,36,.1); color: var(--amber); border: 1px solid rgba(251,191,36,.12); }
+  .attack-why { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.5; }
+  .poly-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  }
+  .poly-table th, .poly-table td {
+    padding: 12px 16px; font-size: 12px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .poly-table thead th {
+    font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    background: var(--surface2);
+  }
+  .poly-table thead th:first-child { color: var(--muted); }
+  .poly-table thead th:nth-child(2) { color: var(--amber); border-left: 1px solid var(--border); }
+  .poly-table thead th:nth-child(3) { color: var(--red); border-left: 1px solid var(--border); }
+  .poly-table tbody td { color: var(--muted); }
+  .poly-table tbody td:first-child { color: var(--text-bright); font-weight: 500; }
+  .poly-table tbody td:nth-child(2),
+  .poly-table tbody td:nth-child(3) {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    border-left: 1px solid var(--border);
+  }
+  .poly-table tbody tr:last-child td { border-bottom: none; }
+  .poly-table tbody tr { background: var(--surface); }
+  .poly-table tbody tr:hover { background: var(--surface2); }
+  .poly-note {
+    font-size: 11.5px; color: var(--muted); text-align: center;
+    margin-top: 16px; font-style: italic;
+  }
+  .props-list { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .props-list { grid-template-columns: 1fr 1fr; } }
+  .prop {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px;
+  }
+  .prop-name {
+    font-size: 13px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .prop-check { color: var(--emerald); font-size: 14px; }
+  .prop-desc { font-size: 12px; color: var(--muted); line-height: 1.55; }
+  .doc-footer {
+    margin-top: 56px; padding: 24px 0;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; position: relative;
+    justify-content: flex-end;
+  }
+  .doc-footer-logo { position: absolute; left: 50%; transform: translateX(-50%); height: 18px; width: auto; opacity: 0.35; }
+  .doc-footer-nav { display: flex; gap: 4px; }
+  .doc-footer-nav a {
+    font-size: 11px; color: var(--muted); text-decoration: none;
+    padding: 5px 12px; border-radius: 5px; border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .doc-footer-nav a:hover { color: var(--text); border-color: var(--border-l); background: var(--surface); }
+  @media (max-width: 700px) {
+    .page { padding: 0 16px; }
+    .nav-bar { flex-direction: column; gap: 12px; align-items: flex-start; }
+    .nav-parts { flex-wrap: wrap; gap: 4px; }
+    .nav-part { font-size: 11px; padding: 5px 10px; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; }
+    .hero { padding: 48px 0 36px; }
+    .hero-sub { font-size: 14px; max-width: 100%; }
+    .section { padding: 36px 0; }
+    .section-desc { font-size: 13px; margin-bottom: 24px; }
+    .pipeline { flex-wrap: wrap; gap: 8px; }
+    .pipe-stage { min-width: 0; flex: 1 1 45%; border-radius: 8px !important; border-left: 1px solid var(--border) !important; }
+    .pipe-arrow { display: none; }
+    .flow { max-width: 100%; }
+    .flow-feed { font-size: 9px; }
+    .flow-node { padding: 12px 14px; }
+    .flow-loop { padding: 12px 8px; }
+    .flow-loop .flow-loop { margin-left: 4px; margin-right: 4px; }
+    .layer-card { padding: 20px; }
+    .layer-desc { font-size: 12px; }
+    .prop { padding: 16px; }
+    .prop-desc { font-size: 11.5px; }
+    .props-list { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .doc-footer { flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+    .onion { padding: 14px; }
+    .onion-desc { font-size: 11px; }
+    .attack-card { padding: 16px; }
+    .poly-table th, .poly-table td { padding: 10px 12px; font-size: 11px; }
+    .poly-table tbody td:nth-child(2),
+    .poly-table tbody td:nth-child(3) { font-size: 10px; }
+  }
+  @media (max-width: 480px) {
+    .page { padding: 0 12px; }
+    .nav-brand { font-size: 12px; }
+    .nav-parts { width: 100%; }
+    .nav-part { flex: 1; text-align: center; font-size: 10px; padding: 6px 4px; white-space: nowrap; }
+    h1 { font-size: 24px; }
+    .hero-badge { font-size: 9.5px; padding: 4px 12px; letter-spacing: 1.5px; }
+    .section { padding: 28px 0; }
+    .pipe-stage { flex: 1 1 100%; }
+    .pipe-title { font-size: 11px; }
+    .pipe-desc { font-size: 10px; }
+    .flow-node .fn-title { font-size: 11px; }
+    .flow-node .fn-desc { font-size: 10.5px; }
+    .flow-loop-label { font-size: 8.5px; }
+    .layers-grid { gap: 10px; }
+    .layer-card { padding: 16px; }
+    .layer-title { font-size: 14px; }
+    .layer-desc { font-size: 11.5px; }
+    .layer-tag { font-size: 9px; padding: 2px 8px; }
+    .props-list { grid-template-columns: 1fr; gap: 8px; }
+    .prop { padding: 14px; }
+    .prop-name { font-size: 12px; }
+    .prop-desc { font-size: 11px; }
+    .doc-footer { margin-top: 36px; padding: 20px 0; }
+    .onion { padding: 10px; }
+    .onion-label { font-size: 9px; left: 12px; }
+    .attack-card { padding: 14px; }
+    .attack-scenario { font-size: 11px; }
+    .attack-has { font-size: 10.5px; }
+    .attack-why { font-size: 10px; }
+    .poly-table { font-size: 10px; }
+    .poly-table th, .poly-table td { padding: 8px 10px; }
+    .poly-table tbody td:nth-child(2),
+    .poly-table tbody td:nth-child(3) { font-size: 9.5px; }
+    .poly-note { font-size: 10.5px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="plexus"></canvas>
+
+<div class="page">
+
+  <nav class="nav-bar">
+    <div class="nav-brand"><img src="../witness-logo.png" alt="Witness"> Architecture</div>
+    <div class="nav-parts">
+      <a class="nav-part nav-home" href="https://witness.dreadsec.co">Home</a>
+      <a class="nav-part active" href="index.html">Mode 1: Standalone</a>
+      <a class="nav-part" href="drm.html">Mode 2: Always-Online DRM</a>
+      <a class="nav-part" href="ring0.html">Mode 3: Ring-0 Enforcement</a>
+      <a class="nav-part" href="novelty.html">Novelty</a>
+    </div>
+  </nav>
+  <div class="arch-disclaimer">details left ambiguous to prevent pre-analysis</div>
+
+  <header class="hero">
+    <div class="hero-badge">Architecture &middot; Mode 1 of 3</div>
+    <h1>Self-Contained<br><em>Binary Protection</em></h1>
+    <p class="hero-sub">
+      Every protection mechanism lives inside the binary itself. No servers,
+      no drivers, no network access. One annotation at compile time and the
+      function is replaced by an encrypted virtual machine that is unique
+      to every build.
+    </p>
+  </header>
+
+  <div class="section">
+    <span class="section-num">01</span>
+    <h2>Anatomy of a Protected Binary</h2>
+    <p class="section-desc">
+      Protection is layered from the outside in. Each layer must be penetrated
+      before the next becomes visible. No single layer can be removed
+      without destroying the others.
+    </p>
+
+    <div class="onion l1">
+      <span class="onion-label">Protected Binary</span>
+      <div class="onion-desc">
+        The executable contains standard code alongside protected regions.
+        The PE structure can be disguised to resemble output from other
+        commercial protectors.
+      </div>
+      <div class="onion l2">
+        <span class="onion-label">Encrypted Handler Section</span>
+        <div class="onion-desc">
+          The VM interpreter and all handler functions reside in an encrypted
+          section. Pages are decrypted on-demand at runtime via exception
+          handling. Static disassembly sees only ciphertext.
+        </div>
+        <div class="onion l3">
+          <span class="onion-label">VM Interpreter + Dispatch</span>
+          <div class="onion-desc">
+            Handlers are directly threaded: each handler resolves and jumps
+            to the next without returning to a central loop. The routing
+            table is encrypted, self-mutating, and unique to each build.
+          </div>
+          <div class="onion l4">
+            <span class="onion-label">Encrypted Bytecode</span>
+            <div class="onion-core">0A 3F 91 D7 02 E8 4C 1B A0 55 7E C3 68 B4 09 F6</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="onion-note">
+      Each layer is cryptographically dependent on the layers above it.
+      Modifying any layer corrupts all inner layers.
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">02</span>
+    <h2>Attack Surface</h2>
+    <p class="section-desc">
+      Every realistic attack vector against a standalone-protected binary,
+      and why each one fails or is severely degraded.
+    </p>
+
+    <div class="attack-grid">
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Static Disassembly</div>
+        <div class="attack-has">Attacker opens the binary in <strong>IDA Pro</strong> or <strong>Ghidra</strong> and attempts to disassemble the protected region.</div>
+        <div class="attack-result blocked">Blocked</div>
+        <div class="attack-why">
+          The VM handler section is fully encrypted. Disassemblers see only ciphertext.
+          Even after decrypting the section, the bytecode uses a custom ISA unique
+          to this build. No public processor module can parse it.
+        </div>
+      </div>
+
+      <div class="attack-card partial">
+        <div class="attack-scenario">Memory Dump at Runtime</div>
+        <div class="attack-has">Attacker <strong>dumps process memory</strong> while the protected function is executing.</div>
+        <div class="attack-result degraded">Degraded</div>
+        <div class="attack-why">
+          All intermediate values are encrypted in the virtual register file. Bytecode
+          is decrypted instruction-by-instruction and never fully materialized. The dump
+          contains encrypted fragments with no structural context.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Symbolic Execution</div>
+        <div class="attack-has">Attacker runs the binary through a symbolic engine (<strong>angr</strong>, <strong>Triton</strong>).</div>
+        <div class="attack-result blocked">Blocked</div>
+        <div class="attack-why">
+          Pre-virtualization deception primitives inject path explosions and unsolvable
+          constraints. The symbolic engine either times out or explores an exponential
+          number of infeasible paths.
+        </div>
+      </div>
+
+      <div class="attack-card partial">
+        <div class="attack-scenario">Handler Pattern Matching</div>
+        <div class="attack-has">Attacker identifies and <strong>catalogs VM handler semantics</strong> to build a lifter.</div>
+        <div class="attack-result degraded">Degraded</div>
+        <div class="attack-why">
+          Multiple structurally-distinct variants exist for each operation. Phantom handlers
+          that are never legitimately reached pollute the analysis. The dispatch table is
+          encrypted and self-mutating.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Bytecode Patching</div>
+        <div class="attack-has">Attacker modifies the <strong>encrypted bytecode</strong> to skip a conditional check.</div>
+        <div class="attack-result blocked">Blocked</div>
+        <div class="attack-why">
+          Bytecode decryption keys are derived from execution path history. Altering any
+          byte corrupts the decryption stream for all subsequent instructions. Integrity
+          chaining detects the modification silently and cascades wrong results.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Cross-Function Patching</div>
+        <div class="attack-has">Attacker patches <strong>one function</strong> while leaving others intact.</div>
+        <div class="attack-result blocked">Blocked</div>
+        <div class="attack-why">
+          Protected functions share persistent cryptographic state. Modifying one function's
+          bytecode corrupts a shared accumulator, causing silent failures in all entangled
+          functions.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">03</span>
+    <h2>Build Polymorphism</h2>
+    <p class="section-desc">
+      Every compilation produces a structurally unique binary. Two builds of
+      the same source code share nothing at the binary level.
+    </p>
+
+    <table class="poly-table">
+      <thead>
+        <tr>
+          <th>Aspect</th>
+          <th>Build A</th>
+          <th>Build B</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Opcode Mapping</td>
+          <td>LOAD &rarr; 0x0A, ADD &rarr; 0x17</td>
+          <td>LOAD &rarr; 0x1F, ADD &rarr; 0x04</td>
+        </tr>
+        <tr>
+          <td>Bytecode Format</td>
+          <td>Big-endian, header-swapped</td>
+          <td>Little-endian, interleaved</td>
+        </tr>
+        <tr>
+          <td>Handler Layout</td>
+          <td>Variant 2, 3, 1, 4</td>
+          <td>Variant 4, 1, 3, 2</td>
+        </tr>
+        <tr>
+          <td>Dispatch Table</td>
+          <td>145 entries, seed 0xC4F1</td>
+          <td>145 entries, seed 0x7B2E</td>
+        </tr>
+        <tr>
+          <td>Section Key</td>
+          <td>per-page, derived from seed A</td>
+          <td>per-page, derived from seed B</td>
+        </tr>
+        <tr>
+          <td>Data Segment</td>
+          <td>Offsets scrambled, mask 0xA5</td>
+          <td>Offsets scrambled, mask 0x3C</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="poly-note">Same source code. Same annotation. Entirely different binary structure.</div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">04</span>
+    <h2>Compilation Pipeline</h2>
+    <p class="section-desc">
+      Annotated functions pass through six stages that transform source
+      code into an encrypted, self-interpreting binary. Each stage is
+      seeded by a cryptographic PRNG, producing a unique result on every build.
+    </p>
+
+    <div class="pipeline">
+      <div class="pipe-stage">
+        <div class="pipe-num">01</div>
+        <div class="pipe-title">Source Code</div>
+        <div class="pipe-desc">Developer annotates functions for protection</div>
+        <div class="pipe-arrow">&rsaquo;</div>
+      </div>
+      <div class="pipe-stage">
+        <div class="pipe-num">02</div>
+        <div class="pipe-title">LLVM IR</div>
+        <div class="pipe-desc">Compiler frontend emits language-independent representation</div>
+        <div class="pipe-arrow">&rsaquo;</div>
+      </div>
+      <div class="pipe-stage active">
+        <div class="pipe-num">03</div>
+        <div class="pipe-title">Anti-Symbolic</div>
+        <div class="pipe-desc">Injects deception primitives that poison automated analysis</div>
+        <div class="pipe-arrow">&rsaquo;</div>
+      </div>
+      <div class="pipe-stage active">
+        <div class="pipe-num">04</div>
+        <div class="pipe-title">Virtualization</div>
+        <div class="pipe-desc">Translates IR to encrypted custom bytecode with embedded interpreter</div>
+        <div class="pipe-arrow">&rsaquo;</div>
+      </div>
+      <div class="pipe-stage active">
+        <div class="pipe-num">05</div>
+        <div class="pipe-title">Diversification</div>
+        <div class="pipe-desc">Generates unique handler variants, phantom decoys, and encrypted routing tables</div>
+        <div class="pipe-arrow">&rsaquo;</div>
+      </div>
+      <div class="pipe-stage">
+        <div class="pipe-num">06</div>
+        <div class="pipe-title">Section Encrypt</div>
+        <div class="pipe-desc">Encrypts the handler section with per-page derived keys</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">05</span>
+    <h2>Execution Architecture</h2>
+    <p class="section-desc">
+      When a protected function is called, the VM takes over. The following
+      diagram traces the execution path through the direct-threaded handler
+      chain, showing how encryption and integrity verification are woven
+      into every step.
+    </p>
+
+    <div class="flow">
+
+      <div class="flow-phase fp-init">Initialization</div>
+
+      <div class="flow-node n-amber">
+        <div class="fn-title">Section Decryption</div>
+        <div class="fn-desc">On first access, the CPU triggers a page fault. An exception handler decrypts the faulting code page using a per-page derived key, then resumes execution transparently.</div>
+      </div>
+      <div class="flow-conn"></div>
+
+      <div class="flow-node n-amber">
+        <div class="fn-title">Root Key Derivation</div>
+        <div class="fn-desc">A per-function seed initializes the cryptographic PRNG that generates all encryption keys, dispatch permutations, and integrity parameters for this function.</div>
+        <div class="flow-feed">unique per function, per build</div>
+      </div>
+      <div class="flow-conn"></div>
+
+      <div class="flow-phase fp-exec">Execution</div>
+
+      <div class="flow-loop">
+        <span class="flow-loop-label">each basic block</span>
+
+        <div class="flow-node n-red">
+          <div class="fn-title">Block Seed Derivation</div>
+          <div class="fn-desc">The execution path history and block index are hashed together to produce a unique seed. This seed determines the decryption stream for all instructions in this block.</div>
+          <div class="flow-feed">path-dependent</div>
+        </div>
+        <div class="flow-conn"></div>
+
+        <div class="flow-loop">
+          <span class="flow-loop-label">each instruction</span>
+
+          <div class="flow-node n-red">
+            <div class="fn-title">Bytecode Decryption</div>
+            <div class="fn-desc">The PRNG stream decrypts the next opcode and its operands. Each byte consumed advances the stream state, coupling decryption order to execution order.</div>
+          </div>
+          <div class="flow-conn"></div>
+
+          <div class="flow-node n-blue">
+            <div class="fn-title">Dispatch Routing</div>
+            <div class="fn-desc">The decrypted opcode is resolved through an encrypted, self-mutating routing table. Table entries are individually encrypted and positions shuffle on every dispatch. Each handler directly transfers to the next without returning to a central loop.</div>
+            <div class="flow-feed">direct-threaded, self-mutating</div>
+          </div>
+          <div class="flow-conn"></div>
+
+          <div class="flow-node n-violet">
+            <div class="fn-title">Handler Execution</div>
+            <div class="fn-desc">The selected handler variant performs the operation. Inputs are decrypted from the virtual register file, the computation executes, and the result is re-encrypted before storage.</div>
+          </div>
+          <div class="flow-conn"></div>
+
+          <div class="flow-node n-rose">
+            <div class="fn-title">Integrity Update</div>
+            <div class="fn-desc">The execution path hash, operation MAC, and bytecode state are updated. These values are load-bearing: they feed into future decryption keys and dispatch decisions.</div>
+            <div class="flow-feed">feeds into next seed</div>
+          </div>
+
+        </div>
+        <div class="flow-conn"></div>
+
+        <div class="flow-node n-emerald">
+          <div class="fn-title">Block Transition Verification</div>
+          <div class="fn-desc">A chained MAC over the entire block is verified against the expected value. This proves the block was reached via a legitimate execution path and that no instructions were skipped or replayed.</div>
+        </div>
+
+      </div>
+
+      <div class="flow-conn"></div>
+      <div class="flow-phase fp-exit">Return</div>
+
+      <div class="flow-node n-emerald">
+        <div class="fn-title">Function Return</div>
+        <div class="fn-desc">The result is decrypted from the virtual register file and returned to the caller. All ephemeral VM state is discarded. The next invocation re-derives everything from the root seed.</div>
+      </div>
+      <div class="flow-conn"></div>
+
+      <div class="flow-phase" style="color: var(--rose);">Entanglement</div>
+
+      <div class="flow-node n-rose">
+        <div class="fn-title">Cross-Function State Update</div>
+        <div class="fn-desc">The execution's cryptographic fingerprint is folded into a persistent accumulator shared across all protected functions. Future function invocations inherit this state, binding their decryption keys to the collective execution history of every protected function that ran before them.</div>
+        <div class="flow-feed">feeds into next function's root derivation</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">06</span>
+    <h2>Value Lifecycle</h2>
+    <p class="section-desc">
+      How a single data value moves through the VM. Values exist in plaintext
+      only during handler execution. At every other stage, they are encrypted
+      with keys that rotate per basic block.
+    </p>
+
+    <div class="flow">
+
+      <div class="flow-node n-amber">
+        <div class="fn-title">Load from Memory</div>
+        <div class="fn-desc">Value read from guest memory through the encrypted data segment. The offset is obfuscated by a per-function mask to prevent direct addressing of virtual registers.</div>
+      </div>
+      <div class="flow-conn"></div>
+
+      <div class="flow-node n-red">
+        <div class="fn-title">Domain Decrypt</div>
+        <div class="fn-desc">Value decrypted from storage domain using a per-block Feistel key. A taint-breaking operation injects hardware entropy to sever symbolic dependency chains.</div>
+      </div>
+      <div class="flow-conn"></div>
+
+      <div class="flow-node n-violet">
+        <div class="fn-title">Handler Computation</div>
+        <div class="fn-desc">The operation executes on the plaintext value. This is the only moment the value exists unencrypted. The result is produced in a CPU register, never written to memory in the clear.</div>
+      </div>
+      <div class="flow-conn"></div>
+
+      <div class="flow-node n-red">
+        <div class="fn-title">Domain Re-Encrypt</div>
+        <div class="fn-desc">Result immediately re-encrypted with the current block's Feistel key before storage. The key has rotated since decryption, so input and output ciphertexts are unrelated even for the identity operation.</div>
+      </div>
+      <div class="flow-conn"></div>
+
+      <div class="flow-node n-rose">
+        <div class="fn-title">Integrity Accumulate</div>
+        <div class="fn-desc">The operation hash, value hash, and path hash are updated. These feed future decryption keys and dispatch decisions. Skipping or reordering any step corrupts all downstream state.</div>
+      </div>
+      <div class="flow-conn"></div>
+
+      <div class="flow-node n-emerald">
+        <div class="fn-title">Store to Segment</div>
+        <div class="fn-desc">Encrypted result written to the data segment at an obfuscated offset. A chained MAC over the segment is updated, binding this store to the entire execution history of the current block.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">07</span>
+    <h2>Protection Layers</h2>
+    <p class="section-desc">
+      Nine independent protection mechanisms operate simultaneously.
+      Each layer independently raises the cost of analysis.
+      Defeating one does not weaken the others.
+    </p>
+
+    <div class="layers-grid">
+
+      <div class="layer-card">
+        <div class="layer-icon ic-vm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div>
+        <div class="layer-title">Code Virtualization</div>
+        <div class="layer-desc">
+          Native instructions are translated into a custom bytecode ISA executed
+          by an embedded interpreter. The ISA is unique to each build. Standard
+          disassemblers and decompilers produce no meaningful output.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Compile-time</span>
+          <span class="layer-tag">Full ISA coverage</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-enc"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+        <div class="layer-title">Bytecode Encryption</div>
+        <div class="layer-desc">
+          Each basic block is encrypted with a unique key derived from execution
+          path history. Bytecode is decrypted instruction-by-instruction during
+          execution. Memory dumps reveal no plaintext patterns.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Per-block keys</span>
+          <span class="layer-tag">Path-dependent</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-sym"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 010 20M12 2a15 15 0 000 20M2 12h20"/></svg></div>
+        <div class="layer-title">Anti-Symbolic Execution</div>
+        <div class="layer-desc">
+          Deception primitives are injected before virtualization: mixed
+          boolean-arithmetic expressions, opaque predicates with high symbolic
+          complexity, and hash-dependent control flow that resists automated
+          constraint solving.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Pre-virtualization</span>
+          <span class="layer-tag">Anti-SMT</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-div"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M8 3H3v5M3 16v5h5M16 21h5v-5M12 12l9-9M12 12L3 3M12 12l9 9M12 12L3 21"/></svg></div>
+        <div class="layer-title">Handler Diversification</div>
+        <div class="layer-desc">
+          Multiple structurally-distinct implementations exist for each operation.
+          Handlers are direct-threaded: each resolves and jumps to the next
+          without a central dispatch point. Phantom handlers that are never
+          legitimately reached fill the routing table alongside real variants,
+          defeating pattern-matching attacks.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Direct-threaded</span>
+          <span class="layer-tag">Phantom decoys</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-val"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <div class="layer-title">Value Domain Encryption</div>
+        <div class="layer-desc">
+          All intermediate values in the virtual register file are encrypted at
+          rest. Encryption keys rotate on every basic block transition. Format-preserving
+          transforms and taint-breaking operations prevent symbolic tracking.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">In-memory</span>
+          <span class="layer-tag">Per-block rotation</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-int"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></div>
+        <div class="layer-title">Integrity Chaining</div>
+        <div class="layer-desc">
+          Execution path, operation history, and bytecode state are continuously
+          hashed into load-bearing cryptographic values. These values feed directly
+          into future decryption keys. Any deviation silently corrupts all
+          subsequent computation.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Chained MAC</span>
+          <span class="layer-tag">Load-bearing</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-sec"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg></div>
+        <div class="layer-title">Section Encryption</div>
+        <div class="layer-desc">
+          The entire VM interpreter is stored in an encrypted section of the
+          executable. Code pages are decrypted on-demand via exception handling
+          when first accessed. Static analysis tools see only ciphertext.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Per-page keys</span>
+          <span class="layer-tag">On-demand</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-tam"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 12H6M12 6v12M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><line x1="4" y1="4" x2="20" y2="20" stroke-width="2.5"/></svg></div>
+        <div class="layer-title">Anti-Tamper</div>
+        <div class="layer-desc">
+          Tampering does not produce error messages. Instead, cryptographic state
+          silently diverges, causing progressively incorrect results. The exact
+          point of detection is ambiguous, making reverse engineering a process
+          of chasing cascading failures.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Silent corruption</span>
+          <span class="layer-tag">Cascading</span>
+        </div>
+      </div>
+
+      <div class="layer-card wide">
+        <div class="layer-icon ic-div"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        <div class="layer-title">Binary Impersonation</div>
+        <div class="layer-desc">
+          The protected binary's PE structure can be reshaped to match the forensic
+          signatures of other commercial protectors. Rich headers, debug directories,
+          import tables, section entropy, and embedded dispatch patterns are all
+          synthesized to match a target profile. Automated classifiers misidentify
+          the protection technology, directing analysts toward the wrong toolchain.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Post-link</span>
+          <span class="layer-tag">10+ profiles</span>
+          <span class="layer-tag">Anti-forensic</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">08</span>
+    <h2>Security Properties</h2>
+    <p class="section-desc">
+      The combination of virtualization, encryption, and integrity chaining
+      produces the following guarantees without any external dependencies.
+    </p>
+
+    <div class="props-list">
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> No External Dependencies</div>
+        <div class="prop-desc">
+          Protection is entirely self-contained. No servers, drivers,
+          network access, or runtime libraries are required. The binary
+          runs anywhere the target platform runs.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Polymorphic Builds</div>
+        <div class="prop-desc">
+          Every compilation produces a cryptographically unique binary.
+          No two builds share the same bytecode format, encryption
+          scheme, or dispatch layout.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Unfingerprintable</div>
+        <div class="prop-desc">
+          Protected binaries contain no strings, constants, or byte
+          patterns that identify the protection technology. The only
+          observable traits are structural characteristics shared by
+          all VM-based protectors.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Full ISA Coverage</div>
+        <div class="prop-desc">
+          Operating on LLVM IR means every instruction the compiler
+          can generate is captured. No unsupported edge cases.
+          Full C++ exception, SIMD, and atomics support.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Per-Function Isolation</div>
+        <div class="prop-desc">
+          Each protected function receives independent encryption
+          keys, dispatch tables, and integrity parameters. Analyzing
+          one function reveals nothing about another.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Load-Bearing Integrity</div>
+        <div class="prop-desc">
+          Integrity verification is not a removable check. Cryptographic
+          values produced during verification are mathematically required
+          for correct execution of subsequent instructions.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Silent Degradation</div>
+        <div class="prop-desc">
+          Tampering causes silent data corruption rather than obvious
+          crashes. The exact point of detection is ambiguous,
+          making attack iteration slow and expensive.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Anti-Symbolic Resistance</div>
+        <div class="prop-desc">
+          Injected deception primitives defeat SMT solvers and
+          symbolic execution engines. Path explosion and constraint
+          poisoning make automated analysis impractical.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Multi-Language Support</div>
+        <div class="prop-desc">
+          Any language that compiles through LLVM is supported:
+          C, C++, Rust, Zig, Objective-C, Fortran, D, and others.
+          No source-level modifications beyond the annotation.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Defense in Depth</div>
+        <div class="prop-desc">
+          Nine independent protection layers operate simultaneously.
+          Defeating one layer does not weaken the others. Each layer
+          independently raises the cost of analysis.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Cross-Function Entanglement</div>
+        <div class="prop-desc">
+          When multiple functions are protected, they share persistent
+          cryptographic state. Each function's execution feeds entropy
+          into a shared accumulator. Breaking one function's protection
+          corrupts the others.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Key Concealment</div>
+        <div class="prop-desc">
+          The VM's bytecode decryption key can be split into multiple
+          secret shares that are proactively re-shared during execution.
+          The actual key never materializes in memory. Scanners see
+          only meaningless share fragments.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Recursive Nesting</div>
+        <div class="prop-desc">
+          Functions can be virtualized multiple times, creating nested
+          VMs. Each layer has independent encryption keys. An attacker
+          who defeats the outer VM faces an entirely new inner VM.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Thread Safety</div>
+        <div class="prop-desc">
+          All VM state is thread-local. Protected functions are fully
+          reentrant and can execute concurrently across any number of
+          threads without synchronization.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Mode Upgradeability</div>
+        <div class="prop-desc">
+          Standalone protection is the foundation. It can be extended
+          with either Always-Online DRM (server-bound licensing) or
+          Ring-0 Enforcement (hardware-bound kernel driver) without
+          changing application code.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <img class="doc-footer-logo" src="../witness-logo.png" alt="Witness">
+    <div class="doc-footer-nav">
+      <a href="drm.html">Mode 2: Always-Online DRM &rarr;</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  var c = document.getElementById('plexus');
+  var ctx = c.getContext('2d');
+  var seed = 0xC4F1;
+  var W, H, pts, edges, pulses, time = 0, raf;
+  var PULSE_SPEED = 80, PULSE_LIFE = 2.5;
+
+  function rng() { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; }
+
+  function init() {
+    W = c.width = window.innerWidth;
+    H = c.height = window.innerHeight;
+    seed = 0xC4F1;
+    var count = Math.max(80, Math.floor((W * H) / 8000));
+    pts = [];
+    for (var i = 0; i < count; i++) {
+      var tier = rng();
+      pts.push({
+        x: rng() * W, y: rng() * H,
+        ox: 0, oy: 0,
+        vx: (rng() - 0.5) * 0.15,
+        vy: (rng() - 0.5) * 0.15,
+        r: tier < 0.05 ? 2.5 + rng() * 2 : tier < 0.25 ? 1.2 + rng() * 1.2 : 0.5 + rng() * 0.8,
+        phase: rng() * Math.PI * 2,
+        freq: 0.3 + rng() * 0.7,
+        hub: tier < 0.05,
+        bright: tier < 0.05 ? 0.5 : tier < 0.25 ? 0.25 : 0.12
+      });
+    }
+    edges = [];
+    var maxDist = 160, maxConn = 6;
+    for (var i = 0; i < pts.length; i++) {
+      var cn = 0;
+      for (var j = i + 1; j < pts.length; j++) {
+        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        var lim = (pts[i].hub || pts[j].hub) ? maxDist * 1.4 : maxDist;
+        var mc = (pts[i].hub || pts[j].hub) ? maxConn + 3 : maxConn;
+        if (d < lim && cn < mc) {
+          edges.push({ a: i, b: j, d: d, lim: lim });
+          cn++;
+        }
+      }
+    }
+    pulses = [];
+    for (var i = 0; i < Math.min(12, edges.length); i++) {
+      spawnPulse();
+    }
+  }
+
+  function spawnPulse() {
+    if (edges.length === 0) return;
+    var ei = Math.floor(rng() * edges.length);
+    var e = edges[ei];
+    pulses.push({ edge: ei, t: 0, life: PULSE_LIFE, fwd: rng() > 0.5 });
+  }
+
+  function frame(ts) {
+    var dt = Math.min(0.05, (ts - time) / 1000);
+    time = ts;
+    ctx.clearRect(0, 0, W, H);
+
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      p.ox = Math.sin(ts * 0.0003 * p.freq + p.phase) * (p.hub ? 8 : 3);
+      p.oy = Math.cos(ts * 0.00025 * p.freq + p.phase * 1.3) * (p.hub ? 6 : 2.5);
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < -20) p.x = W + 20;
+      if (p.x > W + 20) p.x = -20;
+      if (p.y < -20) p.y = H + 20;
+      if (p.y > H + 20) p.y = -20;
+    }
+
+    ctx.lineWidth = 0.4;
+    for (var i = 0; i < edges.length; i++) {
+      var e = edges[i];
+      var pa = pts[e.a], pb = pts[e.b];
+      var ax = pa.x + pa.ox, ay = pa.y + pa.oy;
+      var bx = pb.x + pb.ox, by = pb.y + pb.oy;
+      var dx = ax - bx, dy = ay - by;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d > e.lim * 1.2) continue;
+      var fade = 1 - d / (e.lim * 1.2);
+      var a = fade * 0.08;
+      var t = d / e.lim;
+      var cr = Math.round(248 - t * 30);
+      var cg = Math.round(113 + t * 78);
+      var cb = Math.round(113 - t * 50);
+      ctx.strokeStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + a + ')';
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+    }
+
+    for (var i = pulses.length - 1; i >= 0; i--) {
+      var p = pulses[i];
+      p.t += dt;
+      if (p.t > p.life) {
+        pulses.splice(i, 1);
+        spawnPulse();
+        continue;
+      }
+      var progress = p.t / p.life;
+      var e = edges[p.edge];
+      var pa = pts[e.a], pb = pts[e.b];
+      var ax = pa.x + pa.ox, ay = pa.y + pa.oy;
+      var bx = pb.x + pb.ox, by = pb.y + pb.oy;
+      var px, py;
+      if (p.fwd) {
+        px = ax + (bx - ax) * progress;
+        py = ay + (by - ay) * progress;
+      } else {
+        px = bx + (ax - bx) * progress;
+        py = by + (ay - by) * progress;
+      }
+      var alpha = Math.sin(progress * Math.PI) * 0.7;
+      var grad = ctx.createRadialGradient(px, py, 0, px, py, 6);
+      grad.addColorStop(0, 'rgba(251,191,36,' + alpha + ')');
+      grad.addColorStop(1, 'rgba(251,191,36,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      var px = p.x + p.ox, py = p.y + p.oy;
+      var breathe = 1 + Math.sin(ts * 0.001 * p.freq + p.phase) * 0.3;
+      var r = p.r * breathe;
+      if (p.hub) {
+        var glow = ctx.createRadialGradient(px, py, 0, px, py, r * 4);
+        glow.addColorStop(0, 'rgba(248,113,113,0.15)');
+        glow.addColorStop(0.5, 'rgba(251,191,36,0.04)');
+        glow.addColorStop(1, 'rgba(251,191,36,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(px, py, r * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(251,191,36,' + (p.bright * breathe) + ')';
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    raf = requestAnimationFrame(frame);
+  }
+
+  init();
+  raf = requestAnimationFrame(frame);
+  window.addEventListener('resize', function() { init(); });
+})();
+</script>
+</body>
+</html>

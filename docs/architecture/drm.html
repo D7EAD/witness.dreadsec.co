@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Witness: Always-Online DRM</title>
+<meta name="description" content="Server-bound license enforcement with post-quantum key exchange and per-function token isolation.">
+<meta name="theme-color" content="#060a11">
+<meta property="og:title" content="Witness: Always-Online DRM">
+<meta property="og:description" content="Server-bound license enforcement with post-quantum key exchange and per-function token isolation.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="../witness-logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Witness: Always-Online DRM">
+<meta name="twitter:description" content="Server-bound license enforcement with post-quantum key exchange and per-function token isolation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a11;
+    --surface: #0c1219;
+    --surface2: #111a25;
+    --surface3: #162030;
+    --border: #1a2538;
+    --border-l: #243348;
+    --accent: #4e8eff;
+    --accent-dim: rgba(78,142,255,.08);
+    --violet: #9775fa;
+    --violet-dim: rgba(151,117,250,.08);
+    --emerald: #34d399;
+    --emerald-dim: rgba(52,211,153,.06);
+    --rose: #f472b6;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --text: #c9d1d9;
+    --text-bright: #e6edf3;
+    --muted: #5a6a7e;
+    --dim: #3d4f63;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ── Noise texture ── */
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── Plexus background ── */
+  #plexus {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 0; pointer-events: none;
+  }
+
+  .page { max-width: 960px; margin: 0 auto; padding: 0 28px; }
+
+  /* ── Navigation ── */
+  .nav-bar {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+    margin-bottom: 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-brand { font-weight: 600; font-size: 14px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .nav-brand img { height: 20px; width: auto; }
+  .nav-parts { display: flex; gap: 4px; }
+  .nav-part {
+    font-size: 11.5px; padding: 6px 14px; border-radius: 6px; color: var(--muted);
+    text-decoration: none; font-weight: 500; transition: all 0.2s;
+  }
+  .nav-part:hover { color: var(--text); background: var(--surface2); }
+  .nav-part.active { color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(78,142,255,.15); }
+  .nav-home { border-right: 1px solid var(--border); margin-right: 4px; padding-right: 16px; }
+
+  /* ── Disclaimer ── */
+  .arch-disclaimer {
+    font-size: 9.5px; font-family: 'JetBrains Mono', monospace;
+    color: var(--dim); letter-spacing: 0.5px; opacity: 0.5;
+    padding-top: 10px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 80px 0 60px;
+    text-align: center;
+    position: relative;
+  }
+  .hero::after {
+    content: ''; position: absolute; bottom: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-l), transparent);
+  }
+  .hero-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--emerald);
+    background: var(--emerald-dim); border: 1px solid rgba(52,211,153,.12);
+    padding: 5px 16px; border-radius: 20px; margin-bottom: 24px;
+  }
+  h1 {
+    font-size: 40px; font-weight: 700; line-height: 1.15; letter-spacing: -0.5px;
+    color: var(--text-bright);
+    margin-bottom: 16px;
+  }
+  h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--accent), var(--emerald));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero-sub {
+    font-size: 16px; color: var(--muted); max-width: 560px; margin: 0 auto;
+    line-height: 1.7; font-weight: 300;
+  }
+
+  /* ── Section headers ── */
+  .section { padding: 56px 0; position: relative; }
+  .section + .section { border-top: 1px solid var(--border); }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+    color: var(--dim); letter-spacing: 1px; margin-bottom: 8px; display: block;
+  }
+  h2 {
+    font-size: 24px; font-weight: 600; color: var(--text-bright); margin-bottom: 10px;
+    letter-spacing: -0.3px;
+  }
+  .section-desc { font-size: 14px; color: var(--muted); max-width: 520px; margin-bottom: 36px; }
+
+  /* ── Trust Boundary ── */
+  .boundary {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .boundary-half { padding: 32px 28px; }
+  .boundary-half.client { background: var(--accent-dim); border-right: 1px solid var(--border); }
+  .boundary-half.server { background: var(--emerald-dim); }
+  .boundary-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .boundary-label.cl { color: var(--accent); }
+  .boundary-label.sv { color: var(--emerald); }
+  .boundary-label .ring-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .boundary-label.cl .ring-dot { background: var(--accent); }
+  .boundary-label.sv .ring-dot { background: var(--emerald); }
+  .boundary-items { list-style: none; }
+  .boundary-items li {
+    font-size: 13px; color: var(--text); padding: 5px 0;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .boundary-items li::before {
+    content: ''; width: 4px; height: 4px; border-radius: 1px;
+    margin-top: 8px; flex-shrink: 0;
+  }
+  .boundary-half.client .boundary-items li::before { background: var(--accent); }
+  .boundary-half.server .boundary-items li::before { background: var(--emerald); }
+  .boundary-note {
+    font-size: 11px; color: var(--dim); text-align: center; margin-top: 6px;
+    font-style: italic;
+  }
+
+  /* ── Sequence diagram ── */
+  .seq { margin-top: 8px; }
+  .seq-phase {
+    display: grid; grid-template-columns: 1fr 140px 1fr;
+    margin-bottom: 0; position: relative;
+  }
+  .seq-phase-header {
+    grid-column: 1 / -1; text-align: center;
+    padding: 20px 0 12px; position: relative;
+  }
+  .seq-phase-header::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 50%;
+    height: 1px; background: var(--border);
+  }
+  .seq-phase-tag {
+    display: inline-block; position: relative; z-index: 1;
+    background: var(--bg); padding: 4px 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; border: 1px solid var(--border);
+    border-radius: 5px;
+  }
+  .seq-phase-tag.t1 { color: var(--amber); border-color: rgba(251,191,36,.2); }
+  .seq-phase-tag.t2 { color: var(--accent); border-color: rgba(78,142,255,.2); }
+  .seq-phase-tag.t3 { color: var(--emerald); border-color: rgba(52,211,153,.2); }
+  .seq-phase-tag.t4 { color: var(--violet); border-color: rgba(151,117,250,.2); }
+  .seq-phase-tag.t5 { color: var(--red); border-color: rgba(248,113,113,.2); }
+  .seq-phase-tag.t6 { color: var(--rose); border-color: rgba(244,114,182,.2); }
+
+  .seq-col-headers {
+    display: grid; grid-template-columns: 1fr 140px 1fr;
+    margin-bottom: 4px; padding: 0 4px;
+  }
+  .seq-col-h {
+    text-align: center; font-size: 11px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase; padding: 12px 8px;
+    border-radius: 8px;
+  }
+  .seq-col-h.app { color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(78,142,255,.1); }
+  .seq-col-h.mid { color: var(--dim); background: transparent; border: none; font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none; display: flex; align-items: center; justify-content: center; }
+  .seq-col-h.srv { color: var(--emerald); background: var(--emerald-dim); border: 1px solid rgba(52,211,153,.1); }
+
+  .seq-body { position: relative; padding: 0 4px; }
+
+  .seq-row {
+    display: grid; grid-template-columns: 1fr 140px 1fr;
+    align-items: start; margin: 10px 0; min-height: 40px;
+  }
+  .seq-side {
+    padding: 10px 14px; border-radius: 8px;
+    font-size: 12px; line-height: 1.55;
+  }
+  .seq-side.left { background: rgba(78,142,255,.04); border: 1px solid rgba(78,142,255,.08); margin-right: 8px; }
+  .seq-side.right { background: rgba(52,211,153,.04); border: 1px solid rgba(52,211,153,.08); margin-left: 8px; }
+  .seq-side .st { font-weight: 600; color: var(--text-bright); font-size: 12px; margin-bottom: 3px; }
+  .seq-side .sd { color: var(--muted); font-size: 11.5px; }
+
+  .seq-arrow { display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 8px; }
+  .seq-arrow-name { font-size: 10.5px; font-weight: 600; margin-bottom: 6px; white-space: nowrap; }
+  .seq-arrow-name.send { color: var(--accent); }
+  .seq-arrow-name.recv { color: var(--emerald); }
+  .seq-arrow-line { width: 100%; height: 2px; position: relative; }
+  .seq-arrow-line.fwd { background: linear-gradient(to right, rgba(78,142,255,.6), rgba(52,211,153,.6)); }
+  .seq-arrow-line.bck { background: linear-gradient(to left, rgba(78,142,255,.6), rgba(52,211,153,.6)); }
+  .seq-arrow-line.fwd::after { content: ''; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 6px solid rgba(52,211,153,.7); }
+  .seq-arrow-line.bck::after { content: ''; position: absolute; left: -1px; top: -4px; border: 5px solid transparent; border-right: 6px solid rgba(78,142,255,.7); }
+
+  .seq-note {
+    grid-column: 1 / -1; margin: 4px 20px 8px;
+    padding: 8px 16px; border-radius: 6px; font-size: 11px;
+    color: var(--muted); line-height: 1.5;
+    background: var(--surface); border: 1px dashed var(--border);
+    text-align: center;
+  }
+  .seq-note-wide { text-align: left; max-width: 680px; margin-left: auto; margin-right: auto; }
+
+  .seq-loop {
+    border: 1px dashed var(--border-l); border-radius: 10px;
+    padding: 14px 8px; margin: 6px 0; position: relative;
+  }
+  .seq-loop-label {
+    position: absolute; top: -8px; left: 16px;
+    background: var(--bg); padding: 0 10px;
+    font-size: 9.5px; font-weight: 600; color: var(--amber);
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+
+  /* ── Binding Layers ── */
+  .layers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .layers-grid { grid-template-columns: 1fr; } }
+  .layer-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px;
+    transition: border-color 0.25s, background 0.25s;
+  }
+  .layer-card:hover { border-color: var(--border-l); background: var(--surface2); }
+  .layer-card.wide { grid-column: 1 / -1; }
+  .layer-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px; font-size: 16px;
+  }
+  .layer-icon.ic-license { background: rgba(52,211,153,.08); color: var(--emerald); border: 1px solid rgba(52,211,153,.12); }
+  .layer-icon.ic-machine { background: rgba(78,142,255,.08); color: var(--accent); border: 1px solid rgba(78,142,255,.12); }
+  .layer-icon.ic-section { background: rgba(151,117,250,.08); color: var(--violet); border: 1px solid rgba(151,117,250,.12); }
+  .layer-icon.ic-token { background: rgba(251,191,36,.08); color: var(--amber); border: 1px solid rgba(251,191,36,.12); }
+  .layer-icon.ic-quantum { background: rgba(244,114,182,.08); color: var(--rose); border: 1px solid rgba(244,114,182,.12); }
+  .layer-icon.ic-dki { background: rgba(248,113,113,.08); color: var(--red); border: 1px solid rgba(248,113,113,.12); }
+  .layer-title { font-size: 15px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .layer-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .layer-tags { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .layer-tag {
+    font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 4px;
+    background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--dim);
+  }
+
+  /* ── Attack Surface ── */
+  .attack-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+  @media (max-width: 700px) { .attack-grid { grid-template-columns: 1fr; } }
+  .attack-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; position: relative; overflow: hidden;
+  }
+  .attack-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .attack-card.fail::before { background: var(--red); opacity: 0.5; }
+  .attack-card.partial::before { background: var(--amber); opacity: 0.5; }
+  .attack-scenario { font-size: 12px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .attack-has { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
+  .attack-has strong { color: var(--text); font-weight: 500; }
+  .attack-result {
+    font-size: 11.5px; font-weight: 600; padding: 5px 10px;
+    border-radius: 5px; display: inline-block;
+  }
+  .attack-result.blocked { background: rgba(248,113,113,.1); color: var(--red); border: 1px solid rgba(248,113,113,.12); }
+  .attack-result.degraded { background: rgba(251,191,36,.1); color: var(--amber); border: 1px solid rgba(251,191,36,.12); }
+  .attack-why { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.5; }
+
+  /* ── Properties ── */
+  .props-list { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .props-list { grid-template-columns: 1fr 1fr; } }
+  .prop {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px;
+  }
+  .prop-name {
+    font-size: 13px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .prop-check { color: var(--emerald); font-size: 14px; }
+  .prop-desc { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+  /* ── Footer ── */
+  .doc-footer {
+    margin-top: 56px; padding: 24px 0;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; position: relative;
+    justify-content: space-between;
+  }
+  .doc-footer-logo { position: absolute; left: 50%; transform: translateX(-50%); height: 18px; width: auto; opacity: 0.35; }
+  .doc-footer-nav { display: flex; gap: 4px; }
+  .doc-footer-nav a {
+    font-size: 11px; color: var(--muted); text-decoration: none;
+    padding: 5px 12px; border-radius: 5px; border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .doc-footer-nav a:hover { color: var(--text); border-color: var(--border-l); background: var(--surface); }
+
+  /* ── Responsive: tablet ── */
+  @media (max-width: 700px) {
+    .page { padding: 0 16px; }
+    .nav-bar { flex-direction: column; gap: 12px; align-items: flex-start; }
+    .nav-parts { flex-wrap: wrap; gap: 4px; }
+    .nav-part { font-size: 11px; padding: 5px 10px; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; }
+    .hero { padding: 48px 0 36px; }
+    .hero-sub { font-size: 14px; max-width: 100%; }
+    .section { padding: 36px 0; }
+    .section-desc { font-size: 13px; margin-bottom: 24px; }
+    .boundary { grid-template-columns: 1fr; }
+    .boundary-half { padding: 24px 20px; }
+    .boundary-half.client { border-right: none; border-bottom: 1px solid var(--border); }
+    .seq-phase, .seq-row, .seq-col-headers { grid-template-columns: 1fr; }
+    .seq-arrow, .seq-col-h.mid { display: none; }
+    .seq-side { margin: 4px 0 !important; }
+    .seq-note { margin: 4px 0 8px; padding: 8px 12px; font-size: 11px; max-width: 100% !important; }
+    .seq-loop { padding: 12px 6px; }
+    .seq-loop-label { left: 10px; font-size: 9px; }
+    .seq-col-h { font-size: 10px; padding: 10px 6px; }
+    .attack-card { padding: 16px; }
+    .layer-card { padding: 20px; }
+    .layer-desc { font-size: 12px; }
+    .prop { padding: 16px; }
+    .prop-desc { font-size: 11.5px; }
+    .props-list { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .doc-footer { flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+  }
+
+  /* ── Responsive: phone ── */
+  @media (max-width: 480px) {
+    .page { padding: 0 12px; }
+    .nav-brand { font-size: 12px; }
+    .nav-parts { width: 100%; }
+    .nav-part { flex: 1; text-align: center; font-size: 10px; padding: 6px 4px; white-space: nowrap; }
+    h1 { font-size: 24px; }
+    .hero-badge { font-size: 9.5px; padding: 4px 12px; letter-spacing: 1.5px; }
+    .section { padding: 28px 0; }
+    .boundary-half { padding: 20px 14px; }
+    .boundary-items li { font-size: 12px; }
+    .attack-grid { gap: 10px; }
+    .attack-card { padding: 14px; }
+    .attack-scenario { font-size: 11.5px; }
+    .attack-has { font-size: 11px; }
+    .attack-result { font-size: 11px; padding: 4px 8px; }
+    .attack-why { font-size: 10.5px; }
+    .layers-grid { gap: 10px; }
+    .layer-card { padding: 16px; }
+    .layer-title { font-size: 14px; }
+    .layer-desc { font-size: 11.5px; }
+    .layer-tag { font-size: 9px; padding: 2px 8px; }
+    .props-list { grid-template-columns: 1fr; gap: 8px; }
+    .prop { padding: 14px; }
+    .prop-name { font-size: 12px; }
+    .prop-desc { font-size: 11px; }
+    .doc-footer { margin-top: 36px; padding: 20px 0; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="plexus"></canvas>
+
+<div class="page">
+
+  <nav class="nav-bar">
+    <div class="nav-brand"><img src="../witness-logo.png" alt="Witness"> Architecture</div>
+    <div class="nav-parts">
+      <a class="nav-part nav-home" href="https://witness.dreadsec.co">Home</a>
+      <a class="nav-part" href="index.html">Mode 1: Standalone</a>
+      <a class="nav-part active" href="drm.html">Mode 2: Always-Online DRM</a>
+      <a class="nav-part" href="ring0.html">Mode 3: Ring-0 Enforcement</a>
+      <a class="nav-part" href="novelty.html">Novelty</a>
+    </div>
+  </nav>
+  <div class="arch-disclaimer">details left ambiguous to prevent pre-analysis</div>
+
+  <header class="hero">
+    <div class="hero-badge">Architecture &middot; Mode 2 of 3</div>
+    <h1>Always-Online<br><em>License Enforcement</em></h1>
+    <p class="hero-sub">
+      A remote license server holds cryptographic material required for execution.
+      Protected binaries must maintain a periodic connection to the server to function.
+      After a configurable grace period, disconnected binaries silently degrade.
+      All Mode 1 protections are included by default. DRM and Ring-0 are mutually
+      exclusive &ndash; choose one or the other on top of the standalone foundation.
+    </p>
+  </header>
+
+  <div class="section">
+    <span class="section-num">01</span>
+    <h2>How It Works</h2>
+    <p class="section-desc">
+      Always-Online DRM is supplemental. All standalone Witness protections
+      (virtualization, encrypted bytecode, anti-tamper, integrity chaining)
+      are included by default. The license server adds a remote trust anchor
+      that binds execution to a valid license and specific hardware.
+    </p>
+
+    <div class="boundary">
+      <div class="boundary-half client">
+        <div class="boundary-label cl"><span class="ring-dot"></span> Protected Binary</div>
+        <ul class="boundary-items">
+          <li>Contains encrypted VM bytecode with critical values withheld</li>
+          <li>Cannot derive complete decryption keys without server-held secrets</li>
+          <li>Presents hardware fingerprint and license credentials at activation</li>
+          <li>Periodically proves execution integrity to maintain authorization</li>
+        </ul>
+      </div>
+      <div class="boundary-half server">
+        <div class="boundary-label sv"><span class="ring-dot"></span> License Server</div>
+        <ul class="boundary-items">
+          <li>Stores per-function cryptographic tokens bound to each license</li>
+          <li>Validates hardware identity and enforces machine activation limits</li>
+          <li>Issues encrypted secrets only after successful authentication</li>
+          <li>Monitors heartbeat integrity and revokes compromised licenses</li>
+        </ul>
+      </div>
+    </div>
+    <div class="boundary-note">
+      All communication is protected by post-quantum key exchange and authenticated encryption.
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">02</span>
+    <h2>Attack Surface</h2>
+    <p class="section-desc">
+      What happens when an attacker attempts to bypass the license requirement?
+      Every scenario results in non-functional or degraded execution.
+    </p>
+
+    <div class="attack-grid">
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Unlicensed Binary</div>
+        <div class="attack-has">Attacker obtains the protected binary without a valid license key.</div>
+        <div class="attack-result blocked">Cannot execute</div>
+        <div class="attack-why">
+          Critical constants are withheld from the binary at compile time. Without
+          contacting the server with valid credentials, the VM cannot reconstruct
+          correct decryption keys. Every protected function produces wrong results.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Shared License Key</div>
+        <div class="attack-has">Attacker uses a license key activated on a different machine.</div>
+        <div class="attack-result blocked">Activation refused</div>
+        <div class="attack-why">
+          Each activation binds the license to a hardware fingerprint. The server
+          enforces per-license machine limits. A different machine produces a
+          different fingerprint and is rejected once the activation limit is reached.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Network Interception</div>
+        <div class="attack-has">Attacker captures the encrypted traffic between binary and server.</div>
+        <div class="attack-result blocked">Cannot decrypt</div>
+        <div class="attack-why">
+          The key exchange uses post-quantum cryptography, and all sessions are
+          authenticated. The client generates ephemeral keys per session against the
+          server's embedded identity. Captured traffic cannot be replayed or decrypted,
+          even with a quantum computer. Session keys are unique per activation.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Fake Server</div>
+        <div class="attack-has">Attacker redirects traffic to a server they control.</div>
+        <div class="attack-result blocked">Authentication fails</div>
+        <div class="attack-why">
+          The binary authenticates the server using credentials embedded at compile
+          time. A fake server cannot produce valid authenticated responses. The
+          binary detects the impersonation and refuses to proceed.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Binary Patching</div>
+        <div class="attack-has">Attacker modifies the binary to skip license checks.</div>
+        <div class="attack-result blocked">Silent corruption</div>
+        <div class="attack-why">
+          License verification is not a check that can be bypassed. The server-held
+          secrets are mathematically required for correct decryption. Patching out
+          the verification code does not produce the missing key material. Additionally,
+          integrity is woven into every VM operation, so patches corrupt all future computation.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Disconnected Execution</div>
+        <div class="attack-has">Attacker blocks network access after initial activation.</div>
+        <div class="attack-result degraded">Gradual corruption</div>
+        <div class="attack-why">
+          The server periodically issues integrity challenges that are cryptographically
+          entangled with VM execution state. After a configurable grace period,
+          missing heartbeat responses cause progressive corruption of load-bearing
+          cryptographic values. Computation silently degrades until results become unusable.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">03</span>
+    <h2>Protocol Lifecycle</h2>
+    <p class="section-desc">
+      A multi-phase protocol establishes and maintains the trust relationship
+      between the protected binary and the license server.
+    </p>
+
+    <div class="seq">
+      <div class="seq-col-headers">
+        <div class="seq-col-h app">Protected Binary</div>
+        <div class="seq-col-h mid">encrypted channel</div>
+        <div class="seq-col-h srv">License Server</div>
+      </div>
+
+      <div class="seq-body">
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t1">Activation</span></div>
+
+        <div class="seq-row">
+          <div class="seq-side left">
+            <div class="st">Present Credentials</div>
+            <div class="sd">Submit license key, hardware fingerprint, and ephemeral quantum-resistant public key</div>
+          </div>
+          <div class="seq-arrow">
+            <span class="seq-arrow-name send">activation request</span>
+            <div class="seq-arrow-line fwd"></div>
+          </div>
+          <div class="seq-side right">
+            <div class="st">Validate License</div>
+            <div class="sd">Verify license key, check activation limits, bind hardware fingerprint</div>
+          </div>
+        </div>
+
+        <div class="seq-row">
+          <div class="seq-side left">
+            <div class="st">Derive Session Keys</div>
+            <div class="sd">Decapsulate server response to establish shared session secret</div>
+          </div>
+          <div class="seq-arrow">
+            <span class="seq-arrow-name recv">key encapsulation</span>
+            <div class="seq-arrow-line bck"></div>
+          </div>
+          <div class="seq-side right">
+            <div class="st">Encapsulate Secret</div>
+            <div class="sd">Generate shared secret using quantum-resistant key encapsulation, bind to license</div>
+          </div>
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t2">Token Delivery</span></div>
+
+        <div class="seq-loop">
+          <span class="seq-loop-label">each protected function</span>
+
+          <div class="seq-row">
+            <div class="seq-side left">
+              <div class="st">Request Token</div>
+              <div class="sd">Identify function by index, authenticate request with session key</div>
+            </div>
+            <div class="seq-arrow">
+              <span class="seq-arrow-name send">token request</span>
+              <div class="seq-arrow-line fwd"></div>
+            </div>
+            <div class="seq-side right">
+              <div class="st">Retrieve &amp; Encrypt</div>
+              <div class="sd">Look up stored function token, encrypt with session key and hardware-specific transform</div>
+            </div>
+          </div>
+
+          <div class="seq-row">
+            <div class="seq-side left">
+              <div class="st">Apply Token</div>
+              <div class="sd">Decrypt and inject token into VM key derivation &ndash; function becomes executable</div>
+            </div>
+            <div class="seq-arrow">
+              <span class="seq-arrow-name recv">encrypted token</span>
+              <div class="seq-arrow-line bck"></div>
+            </div>
+            <div class="seq-side right">
+              <div class="st">Log Issuance</div>
+              <div class="sd">Record token delivery for audit trail and abuse detection</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t3">Section Decryption</span></div>
+
+        <div class="seq-note">
+          The VM handler section is encrypted with a key that incorporates a server-held
+          augmentation value. After successful activation, the server provides this value,
+          enabling the binary to derive the correct per-page decryption keys. Without it,
+          the entire VM handler section remains encrypted and non-functional.
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t4">Continuous Verification</span></div>
+
+        <div class="seq-loop">
+          <span class="seq-loop-label">periodic</span>
+
+          <div class="seq-row">
+            <div class="seq-side left">
+              <div class="st">Heartbeat</div>
+              <div class="sd">Submit execution integrity proof and runtime state digest</div>
+            </div>
+            <div class="seq-arrow">
+              <span class="seq-arrow-name send">integrity proof</span>
+              <div class="seq-arrow-line fwd"></div>
+            </div>
+            <div class="seq-side right">
+              <div class="st">Validate &amp; Challenge</div>
+              <div class="sd">Verify proof against expected values, issue fresh challenge for next interval</div>
+            </div>
+          </div>
+
+          <div class="seq-row">
+            <div class="seq-side left">
+              <div class="st">Incorporate Response</div>
+              <div class="sd">Fold server challenge into load-bearing execution state &ndash; missing responses corrupt computation</div>
+            </div>
+            <div class="seq-arrow">
+              <span class="seq-arrow-name recv">challenge</span>
+              <div class="seq-arrow-line bck"></div>
+            </div>
+            <div class="seq-side right">
+              <div class="st">Monitor Health</div>
+              <div class="sd">Track heartbeat frequency, detect anomalies, flag suspicious patterns</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t5">Enforcement</span></div>
+
+        <div class="seq-note">
+          License violations, expired heartbeats, or tamper detection do not produce
+          immediate error messages. Instead, load-bearing cryptographic values are
+          progressively corrupted, causing silent data degradation. The exact point of
+          failure is ambiguous, making reverse engineering significantly harder.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">04</span>
+    <h2>Binding Layers</h2>
+    <p class="section-desc">
+      Six independent cryptographic binding mechanisms operate simultaneously.
+      Each layer independently prevents unauthorized execution.
+    </p>
+
+    <div class="layers-grid">
+
+      <div class="layer-card">
+        <div class="layer-icon ic-license"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+        <div class="layer-title">License Binding</div>
+        <div class="layer-desc">
+          Each license key is cryptographically bound to a limited number of machines.
+          The server enforces activation limits and tracks all bound hardware identities.
+          Revoked or expired licenses immediately prevent token issuance.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Server-side</span>
+          <span class="layer-tag">Per-license</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-machine"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></div>
+        <div class="layer-title">Machine Fingerprinting</div>
+        <div class="layer-desc">
+          A cryptographic hash of hardware identifiers uniquely identifies each
+          machine. The server validates the fingerprint before issuing tokens and
+          enforces per-license activation limits. Different hardware produces a
+          different identity that the server refuses to authorize.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Hardware-bound</span>
+          <span class="layer-tag">Anti-sharing</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-section"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <div class="layer-title">Section-Level Encryption</div>
+        <div class="layer-desc">
+          The entire VM handler section is encrypted with per-page derived keys
+          that incorporate a server-held augmentation value. Without this value,
+          the binary cannot decrypt its own interpreter and all execution fails.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Binary-wide</span>
+          <span class="layer-tag">Server-gated</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-token"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg></div>
+        <div class="layer-title">Function-Level Token Binding</div>
+        <div class="layer-desc">
+          Critical constants are extracted from each protected function at compile
+          time and stored on the server. At runtime, the server returns these tokens
+          individually. Each function is independently gated by its own token.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Per-function</span>
+          <span class="layer-tag">Server-held</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-quantum"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 010 20M12 2a15 15 0 000 20M2 12h20"/></svg></div>
+        <div class="layer-title">Quantum-Resistant Key Exchange</div>
+        <div class="layer-desc">
+          All key exchanges use post-quantum authenticated encryption. Even an
+          adversary with access to a quantum computer cannot decrypt captured
+          activation traffic or recover session keys from network recordings.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Post-quantum</span>
+          <span class="layer-tag">Future-proof</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-dki"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9"/></svg></div>
+        <div class="layer-title">Distributed Integrity Verification</div>
+        <div class="layer-desc">
+          A cryptographic computation is distributed across every VM dispatch.
+          Each basic block computes a small piece, and results feed into load-bearing
+          execution state. Removing or patching any piece causes cascading divergence
+          that corrupts all subsequent decryption.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Anti-tamper</span>
+          <span class="layer-tag">Every dispatch</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">05</span>
+    <h2>Security Properties</h2>
+    <p class="section-desc">
+      The combination of server-held secrets, hardware binding, and continuous
+      verification produces the following guarantees.
+    </p>
+
+    <div class="props-list">
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Per-License Binding</div>
+        <div class="prop-desc">
+          Each license is bound to a limited number of machines.
+          The server tracks activations and enforces limits.
+          Licenses can be revoked at any time.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Per-Machine Binding</div>
+        <div class="prop-desc">
+          Hardware fingerprinting ties tokens to specific machines.
+          Tokens issued for one machine cannot be used on another,
+          preventing license sharing and cloning.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Per-Function Isolation</div>
+        <div class="prop-desc">
+          Each protected function has its own independent token.
+          Recovering one token does not compromise any other
+          function. Granular revocation is possible.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Quantum Resistance</div>
+        <div class="prop-desc">
+          Post-quantum key encapsulation protects all key exchanges.
+          Captured traffic remains secure even against future
+          quantum computing attacks.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Load-Bearing Integrity</div>
+        <div class="prop-desc">
+          Integrity verification is not a removable check. Cryptographic
+          computations are distributed across every dispatch, making
+          tampering mathematically expensive.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Silent Degradation</div>
+        <div class="prop-desc">
+          Failed verifications cause progressive data corruption rather
+          than obvious crashes. The exact point of detection is ambiguous,
+          complicating reverse engineering.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Continuous Verification</div>
+        <div class="prop-desc">
+          Periodic heartbeats verify license validity throughout
+          execution. After a configurable grace period, missed
+          heartbeats cause progressive cryptographic degradation.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Anti-Sharing</div>
+        <div class="prop-desc">
+          Hardware fingerprints, activation limits, and machine-specific
+          token encryption combine to prevent license sharing across
+          different machines.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Server-Side Revocation</div>
+        <div class="prop-desc">
+          Compromised or pirated licenses can be revoked server-side
+          at any time. Revocation takes effect at the next heartbeat
+          interval with no binary update required.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Cross-Function Entanglement</div>
+        <div class="prop-desc">
+          Protected functions share persistent cryptographic state.
+          Each function's execution feeds entropy into a shared
+          accumulator. Breaking one function's protection corrupts
+          the others.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Thread Safety</div>
+        <div class="prop-desc">
+          All VM state is thread-local. Protected functions are fully
+          reentrant and can execute concurrently across any number
+          of threads without synchronization.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Binary Impersonation</div>
+        <div class="prop-desc">
+          The binary's PE structure can be reshaped to match the
+          forensic signatures of other commercial protectors,
+          misdirecting automated classification tools.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <div class="doc-footer-nav">
+      <a href="index.html">&larr; Mode 1: Standalone</a>
+    </div>
+    <img class="doc-footer-logo" src="../witness-logo.png" alt="Witness">
+    <div class="doc-footer-nav">
+      <a href="ring0.html">Mode 3: Ring-0 Enforcement &rarr;</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  var c = document.getElementById('plexus');
+  var ctx = c.getContext('2d');
+  var seed = 0x3D9E;
+  function rng() { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; }
+
+  function draw() {
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+    var w = c.width, h = c.height;
+    var pts = [];
+    var count = Math.max(40, Math.floor((w * h) / 18000));
+    seed = 0x3D9E;
+    for (var i = 0; i < count; i++) {
+      var cluster = rng() < 0.35;
+      var cx = rng() * w, cy = rng() * h;
+      pts.push({ x: cx, y: cy, s: 1 + rng() * 2.2 });
+      if (cluster) {
+        var n = 2 + Math.floor(rng() * 3);
+        for (var k = 0; k < n; k++) {
+          pts.push({
+            x: cx + (rng() - 0.5) * 120,
+            y: cy + (rng() - 0.5) * 120,
+            s: 0.8 + rng() * 1.5
+          });
+        }
+      }
+    }
+    var maxDist = 130;
+    ctx.lineWidth = 0.4;
+    for (var i = 0; i < pts.length; i++) {
+      for (var j = i + 1; j < pts.length; j++) {
+        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        if (d < maxDist) {
+          var a = (1 - d / maxDist) * 0.1;
+          var t = d / maxDist;
+          var cr = Math.round(52 + t * 26);
+          var cg = Math.round(211 - t * 69);
+          var cb = Math.round(153 + t * 102);
+          ctx.strokeStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + a + ')';
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[j].x, pts[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      var glow = rng() < 0.15;
+      ctx.fillStyle = glow ? 'rgba(52, 211, 153, 0.35)' : 'rgba(52, 211, 153, 0.15)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  draw();
+  window.addEventListener('resize', draw);
+})();
+</script>
+</body>
+</html>

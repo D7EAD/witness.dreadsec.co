@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Witness: What's Never Been Done</title>
+<meta name="description" content="Techniques that exist in no other code protector: binary impersonation, anti-AI adversarial primitives, per-build algorithm synthesis, algebraic bytecode encoding, and more.">
+<meta name="theme-color" content="#060a11">
+<meta property="og:title" content="Witness: What's Never Been Done">
+<meta property="og:description" content="Techniques that exist in no other code protector: binary impersonation, anti-AI adversarial primitives, per-build algorithm synthesis, algebraic bytecode encoding, and more.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="../witness-logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Witness: What's Never Been Done">
+<meta name="twitter:description" content="Techniques that exist in no other code protector.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a11;
+    --surface: #0c1219;
+    --surface2: #111a25;
+    --surface3: #162030;
+    --border: #1a2538;
+    --border-l: #243348;
+    --accent: #4e8eff;
+    --accent-dim: rgba(78,142,255,.08);
+    --violet: #9775fa;
+    --violet-dim: rgba(151,117,250,.08);
+    --emerald: #34d399;
+    --emerald-dim: rgba(52,211,153,.06);
+    --rose: #f472b6;
+    --rose-dim: rgba(244,114,182,.06);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,.06);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,.06);
+    --text: #c9d1d9;
+    --text-bright: #e6edf3;
+    --muted: #5a6a7e;
+    --dim: #3d4f63;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ── Noise texture ── */
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── Plexus background ── */
+  #plexus {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 0; pointer-events: none;
+  }
+
+  .page { max-width: 960px; margin: 0 auto; padding: 0 28px; }
+
+  /* ── Navigation ── */
+  .nav-bar {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+    margin-bottom: 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-brand { font-weight: 600; font-size: 14px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .nav-brand img { height: 20px; width: auto; }
+  .nav-parts { display: flex; gap: 4px; }
+  .nav-part {
+    font-size: 11.5px; padding: 6px 14px; border-radius: 6px; color: var(--muted);
+    text-decoration: none; font-weight: 500; transition: all 0.2s;
+  }
+  .nav-part:hover { color: var(--text); background: var(--surface2); }
+  .nav-part.active { color: var(--rose); background: var(--rose-dim); border: 1px solid rgba(244,114,182,.15); }
+  .nav-home { border-right: 1px solid var(--border); margin-right: 4px; padding-right: 16px; }
+
+  /* ── Disclaimer ── */
+  .arch-disclaimer {
+    font-size: 9.5px; font-family: 'JetBrains Mono', monospace;
+    color: var(--dim); letter-spacing: 0.5px; opacity: 0.5;
+    padding-top: 10px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 80px 0 60px;
+    text-align: center;
+    position: relative;
+  }
+  .hero::after {
+    content: ''; position: absolute; bottom: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-l), transparent);
+  }
+  .hero-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--rose);
+    background: var(--rose-dim); border: 1px solid rgba(244,114,182,.12);
+    padding: 5px 16px; border-radius: 20px; margin-bottom: 24px;
+  }
+  h1 {
+    font-size: 40px; font-weight: 700; line-height: 1.15; letter-spacing: -0.5px;
+    color: var(--text-bright);
+    margin-bottom: 16px;
+  }
+  h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--rose), var(--amber));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero-sub {
+    font-size: 16px; color: var(--muted); max-width: 600px; margin: 0 auto;
+    line-height: 1.7; font-weight: 300;
+  }
+
+  /* ── Section headers ── */
+  .section { padding: 56px 0; position: relative; }
+  .section + .section { border-top: 1px solid var(--border); }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+    color: var(--dim); letter-spacing: 1px; margin-bottom: 8px; display: block;
+  }
+  h2 {
+    font-size: 24px; font-weight: 600; color: var(--text-bright); margin-bottom: 10px;
+    letter-spacing: -0.3px;
+  }
+  .section-desc { font-size: 14px; color: var(--muted); max-width: 560px; margin-bottom: 36px; }
+
+  /* ── Profile Cards (Impersonation) ── */
+  .profile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 16px; }
+  .profile-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 14px; text-align: center;
+    transition: border-color 0.25s, background 0.25s;
+    position: relative; overflow: hidden;
+  }
+  .profile-card:hover { border-color: var(--border-l); background: var(--surface2); }
+  .profile-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--rose); opacity: 0.3;
+  }
+  .profile-name {
+    font-size: 12px; font-weight: 600; color: var(--text-bright);
+    margin-bottom: 6px;
+  }
+  .profile-type {
+    font-size: 9.5px; font-weight: 500; color: var(--dim);
+    letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .profile-artifacts {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .profile-artifact {
+    font-size: 10px; color: var(--muted); line-height: 1.4;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .impersonate-note {
+    font-size: 11.5px; color: var(--muted); text-align: center;
+    margin-top: 12px; padding: 14px 20px;
+    background: var(--surface); border: 1px dashed var(--border);
+    border-radius: 8px; line-height: 1.6;
+  }
+  .impersonate-note strong { color: var(--rose); font-weight: 600; }
+
+  /* ── Artifact Table ── */
+  .artifact-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+    margin-top: 20px;
+  }
+  .artifact-table th, .artifact-table td {
+    padding: 10px 14px; font-size: 11.5px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .artifact-table thead th {
+    font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    background: var(--surface2); color: var(--muted);
+  }
+  .artifact-table tbody td { color: var(--muted); }
+  .artifact-table tbody td:first-child {
+    color: var(--text-bright); font-weight: 500;
+  }
+  .artifact-table tbody tr:last-child td { border-bottom: none; }
+  .artifact-table tbody tr { background: var(--surface); }
+  .artifact-table tbody tr:hover { background: var(--surface2); }
+  .artifact-check { color: var(--rose); font-size: 12px; text-align: center; }
+
+  /* ── Bomb Cards (Anti-AI) ── */
+  .bomb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .bomb-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 22px; position: relative; overflow: hidden;
+  }
+  .bomb-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--red), var(--amber));
+    opacity: 0.5;
+  }
+  .bomb-card:hover { border-color: var(--border-l); background: var(--surface2); }
+  .bomb-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--dim); letter-spacing: 1px; margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .bomb-title { font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .bomb-target {
+    font-size: 11px; color: var(--red); font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .bomb-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .bomb-effect {
+    margin-top: 10px; padding: 8px 12px;
+    background: rgba(248,113,113,.04); border: 1px solid rgba(248,113,113,.08);
+    border-radius: 6px; font-size: 11px; color: var(--dim); line-height: 1.5;
+  }
+  .bomb-effect strong { color: var(--amber); font-weight: 500; }
+
+  /* ── Synthesis Comparison ── */
+  .synth-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  }
+  .synth-table th, .synth-table td {
+    padding: 12px 16px; font-size: 12px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .synth-table thead th {
+    font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    background: var(--surface2);
+  }
+  .synth-table thead th:first-child { color: var(--muted); }
+  .synth-table thead th:nth-child(2) { color: var(--dim); border-left: 1px solid var(--border); }
+  .synth-table thead th:nth-child(3) { color: var(--rose); border-left: 1px solid var(--border); }
+  .synth-table tbody td { color: var(--muted); }
+  .synth-table tbody td:first-child { color: var(--text-bright); font-weight: 500; }
+  .synth-table tbody td:nth-child(2),
+  .synth-table tbody td:nth-child(3) { border-left: 1px solid var(--border); }
+  .synth-table tbody td:nth-child(3) {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .synth-table tbody tr:last-child td { border-bottom: none; }
+  .synth-table tbody tr { background: var(--surface); }
+  .synth-table tbody tr:hover { background: var(--surface2); }
+
+  /* ── Language Badges ── */
+  .lang-grid {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px;
+  }
+  .lang-badge {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 22px;
+    text-align: center; transition: border-color 0.25s, background 0.25s;
+    flex: 1 1 auto; min-width: 100px;
+  }
+  .lang-badge:hover { border-color: var(--border-l); background: var(--surface2); }
+  .lang-name {
+    font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 3px;
+  }
+  .lang-note {
+    font-size: 10px; color: var(--dim); font-family: 'JetBrains Mono', monospace;
+  }
+  .lang-compare {
+    margin-top: 20px; padding: 16px 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .lang-compare-title {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px;
+  }
+  .lang-compare-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .lang-compare-row:last-child { border-bottom: none; }
+  .lang-compare-name { color: var(--text-bright); font-weight: 500; }
+  .lang-compare-val { color: var(--dim); font-size: 11px; }
+  .lang-compare-val.highlight { color: var(--rose); font-weight: 500; }
+
+  /* ── Entanglement visual ── */
+  .entangle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .entangle-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 22px; position: relative;
+  }
+  .entangle-card.wide { grid-column: 1 / -1; }
+  .entangle-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px; font-size: 16px;
+  }
+  .entangle-icon.ic-rose { background: rgba(244,114,182,.08); color: var(--rose); border: 1px solid rgba(244,114,182,.12); }
+  .entangle-icon.ic-amber { background: rgba(251,191,36,.08); color: var(--amber); border: 1px solid rgba(251,191,36,.12); }
+  .entangle-icon.ic-red { background: rgba(248,113,113,.08); color: var(--red); border: 1px solid rgba(248,113,113,.12); }
+  .entangle-icon.ic-violet { background: rgba(151,117,250,.08); color: var(--violet); border: 1px solid rgba(151,117,250,.12); }
+  .entangle-title { font-size: 15px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .entangle-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .entangle-tag {
+    display: inline-block; margin-top: 10px;
+    font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 4px;
+    background: rgba(244,114,182,.06); border: 1px solid rgba(244,114,182,.1);
+    color: var(--rose);
+  }
+
+  /* ── Layer Stack (Algebraic) ── */
+  .layer-stack { max-width: 560px; margin: 0 auto; }
+  .stack-node {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; position: relative;
+  }
+  .stack-node + .stack-conn + .stack-node { margin-top: 0; }
+  .stack-node .sn-title { font-size: 13px; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; }
+  .stack-node .sn-desc { font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+  .stack-node .sn-mono {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--dim); margin-top: 6px; display: block;
+  }
+  .stack-node.s-rose { border-color: rgba(244,114,182,.15); }
+  .stack-node.s-rose .sn-title { color: var(--rose); }
+  .stack-node.s-violet { border-color: rgba(151,117,250,.15); }
+  .stack-node.s-violet .sn-title { color: var(--violet); }
+  .stack-node.s-red { border-color: rgba(248,113,113,.15); }
+  .stack-node.s-red .sn-title { color: var(--red); }
+  .stack-node.s-amber { border-color: rgba(251,191,36,.15); }
+  .stack-node.s-amber .sn-title { color: var(--amber); }
+  .stack-node.s-emerald { border-color: rgba(52,211,153,.15); }
+  .stack-node.s-emerald .sn-title { color: var(--emerald); }
+  .stack-node.s-blue { border-color: rgba(78,142,255,.15); }
+  .stack-node.s-blue .sn-title { color: var(--accent); }
+  .stack-conn {
+    width: 2px; height: 20px; margin: 0 auto;
+    background: linear-gradient(to bottom, var(--border-l), var(--border));
+  }
+  .stack-label {
+    text-align: center; margin: 16px 0 8px;
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .stack-note {
+    text-align: center; margin-top: 14px;
+    font-size: 11px; color: var(--dim); font-style: italic;
+  }
+
+  /* ── Innovation Cards ── */
+  .innov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .innov-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 22px; position: relative; overflow: hidden;
+    transition: border-color 0.25s, background 0.25s;
+  }
+  .innov-card:hover { border-color: var(--border-l); background: var(--surface2); }
+  .innov-card.wide { grid-column: 1 / -1; }
+  .innov-badge {
+    display: inline-block; font-size: 9px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--rose);
+    background: rgba(244,114,182,.08); border: 1px solid rgba(244,114,182,.1);
+    padding: 3px 10px; border-radius: 4px; margin-bottom: 12px;
+  }
+  .innov-title { font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .innov-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .innov-detail {
+    margin-top: 10px; font-size: 11px; color: var(--dim); line-height: 1.5;
+    padding: 8px 12px; background: rgba(255,255,255,.015);
+    border-radius: 6px; border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Crypto Stack ── */
+  .crypto-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .crypto-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 22px; text-align: center;
+    transition: border-color 0.25s;
+  }
+  .crypto-card:hover { border-color: var(--border-l); }
+  .crypto-era {
+    font-size: 9px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  .crypto-era.classical { color: var(--dim); }
+  .crypto-era.modern { color: var(--accent); }
+  .crypto-era.pq { color: var(--rose); }
+  .crypto-name { font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; }
+  .crypto-role { font-size: 11px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
+  .crypto-spec {
+    font-size: 10px; color: var(--dim); font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Footer ── */
+  .doc-footer {
+    margin-top: 56px; padding: 24px 0;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; position: relative;
+    justify-content: space-between;
+  }
+  .doc-footer-logo { position: absolute; left: 50%; transform: translateX(-50%); height: 18px; width: auto; opacity: 0.35; }
+  .doc-footer-nav { display: flex; gap: 4px; }
+  .doc-footer-nav a {
+    font-size: 11px; color: var(--muted); text-decoration: none;
+    padding: 5px 12px; border-radius: 5px; border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .doc-footer-nav a:hover { color: var(--text); border-color: var(--border-l); background: var(--surface); }
+
+  /* ── Responsive: tablet ── */
+  @media (max-width: 700px) {
+    .page { padding: 0 16px; }
+    .nav-bar { flex-direction: column; gap: 12px; align-items: flex-start; }
+    .nav-parts { flex-wrap: wrap; gap: 4px; }
+    .nav-part { font-size: 11px; padding: 5px 10px; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; }
+    .hero { padding: 48px 0 36px; }
+    .hero-sub { font-size: 14px; max-width: 100%; }
+    .section { padding: 36px 0; }
+    .section-desc { font-size: 13px; margin-bottom: 24px; }
+    .profile-grid { grid-template-columns: repeat(3, 1fr); }
+    .bomb-grid { grid-template-columns: 1fr; }
+    .entangle-grid { grid-template-columns: 1fr; }
+    .innov-grid { grid-template-columns: 1fr; }
+    .crypto-grid { grid-template-columns: 1fr; }
+    .lang-grid { gap: 8px; }
+    .lang-badge { min-width: 80px; padding: 12px 16px; }
+    .doc-footer { flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+  }
+
+  /* ── Responsive: phone ── */
+  @media (max-width: 480px) {
+    .page { padding: 0 12px; }
+    .nav-brand { font-size: 12px; }
+    .nav-parts { width: 100%; }
+    .nav-part { flex: 1; text-align: center; font-size: 10px; padding: 6px 4px; white-space: nowrap; }
+    h1 { font-size: 24px; }
+    .hero-badge { font-size: 9.5px; padding: 4px 12px; letter-spacing: 1.5px; }
+    .section { padding: 28px 0; }
+    .profile-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .profile-card { padding: 12px 10px; }
+    .profile-name { font-size: 11px; }
+    .profile-artifact { font-size: 9px; }
+    .bomb-card { padding: 16px; }
+    .bomb-title { font-size: 13px; }
+    .bomb-desc { font-size: 11px; }
+    .bomb-effect { font-size: 10px; }
+    .synth-table th, .synth-table td { padding: 8px 10px; font-size: 10.5px; }
+    .synth-table tbody td:nth-child(3) { font-size: 9.5px; }
+    .lang-badge { min-width: 70px; padding: 10px 12px; }
+    .lang-name { font-size: 12px; }
+    .entangle-card { padding: 16px; }
+    .entangle-title { font-size: 14px; }
+    .entangle-desc { font-size: 12px; }
+    .stack-node { padding: 12px 16px; }
+    .innov-card { padding: 16px; }
+    .innov-title { font-size: 13px; }
+    .innov-desc { font-size: 11px; }
+    .crypto-card { padding: 16px; }
+    .crypto-name { font-size: 13px; }
+    .doc-footer { margin-top: 36px; padding: 20px 0; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="plexus"></canvas>
+
+<div class="page">
+
+  <nav class="nav-bar">
+    <div class="nav-brand"><img src="../witness-logo.png" alt="Witness"> Architecture</div>
+    <div class="nav-parts">
+      <a class="nav-part nav-home" href="https://witness.dreadsec.co">Home</a>
+      <a class="nav-part" href="index.html">Standalone</a>
+      <a class="nav-part" href="drm.html">DRM</a>
+      <a class="nav-part" href="ring0.html">Ring-0</a>
+      <a class="nav-part active" href="novelty.html">Novelty</a>
+    </div>
+  </nav>
+  <div class="arch-disclaimer">details left ambiguous to prevent pre-analysis</div>
+
+  <header class="hero">
+    <div class="hero-badge">Novel Techniques</div>
+    <h1><em>Witness</em></h1>
+    <p class="hero-sub">
+      A collection of novel architectural implementations within <em style="font-style:normal;color:var(--red);">Witness</em>.
+    </p>
+  </header>
+
+  <div class="section">
+    <span class="section-num">01</span>
+    <h2>Binary Impersonation</h2>
+    <p class="section-desc">
+      The protected binary's PE structure is reshaped to match the forensic
+      fingerprint of a different commercial protector. Automated classifiers,
+      YARA rules, and triage tools misidentify the protection technology
+      and direct analysts toward the wrong toolchain.
+    </p>
+
+    <div class="profile-grid">
+      <div class="profile-card">
+        <div class="profile-name">VMProtect</div>
+        <div class="profile-type">VM Protector</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">Themida</div>
+        <div class="profile-type">Packer + VM</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">Denuvo</div>
+        <div class="profile-type">DRM</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">CodeVirtualizer</div>
+        <div class="profile-type">VM Protector</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">Obsidium</div>
+        <div class="profile-type">Packer</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">UPX</div>
+        <div class="profile-type">Compressor</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">ASPack</div>
+        <div class="profile-type">Packer</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">MPRESS</div>
+        <div class="profile-type">Compressor</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">Enigma</div>
+        <div class="profile-type">Protector</div>
+      </div>
+      <div class="profile-card">
+        <div class="profile-name">Petite</div>
+        <div class="profile-type">Compressor</div>
+      </div>
+    </div>
+
+    <div class="impersonate-note">
+      <strong>No other protector can impersonate 10+ different products on demand.</strong>
+      The analyst's first step, identifying the protection technology,
+      yields the wrong answer. Every tool, script, and heuristic they apply
+      afterward is calibrated for a product that isn't present.
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">02</span>
+    <h2>Anti-AI Analysis</h2>
+    <p class="section-desc">
+      Modern reverse engineering increasingly relies on neural decompilers,
+      LLM-assisted analysis, and GNN-based program understanding. Multiple
+      adversarial primitives are injected specifically to degrade
+      AI-assisted reverse engineering.
+    </p>
+
+    <div class="bomb-grid">
+
+      <div class="bomb-card">
+        <div class="bomb-num">Primitive 01</div>
+        <div class="bomb-title">Attention Saturation</div>
+        <div class="bomb-target">Targets: Transformer-based decompilers, LLM analysis</div>
+        <div class="bomb-desc">
+          Exploits the quadratic scaling of transformer self-attention.
+          Semantically meaningless operations exhaust the model's attention
+          budget, crowding actual logic beyond the attention horizon.
+        </div>
+      </div>
+
+      <div class="bomb-card">
+        <div class="bomb-num">Primitive 02</div>
+        <div class="bomb-title">Graph Poisoning</div>
+        <div class="bomb-target">Targets: GNN-based program analysis, data flow recovery</div>
+        <div class="bomb-desc">
+          Injects phantom dependency edges that appear structurally identical
+          to real data flows but carry no semantic meaning. Graph neural
+          networks trained on data flow edges are poisoned with
+          high-confidence false information.
+        </div>
+      </div>
+
+      <div class="bomb-card">
+        <div class="bomb-num">Primitive 03</div>
+        <div class="bomb-title">Context Window Exhaustion</div>
+        <div class="bomb-target">Targets: Sequence models, RNN/LSTM decompilers</div>
+        <div class="bomb-desc">
+          Forces models to maintain long-range context across function
+          boundaries for dependencies that ultimately contribute nothing.
+          Hidden-state capacity is consumed by algebraic noise, degrading
+          accuracy on real dependencies.
+        </div>
+      </div>
+
+      <div class="bomb-card">
+        <div class="bomb-num">Primitive 04</div>
+        <div class="bomb-title">Embedding Disruption</div>
+        <div class="bomb-target">Targets: Token embeddings, call graph models, positional encodings</div>
+        <div class="bomb-desc">
+          Coordinated sub-strategies that corrupt the model's internal
+          representation at the token, function, and structural levels
+          simultaneously. Embedding vectors for real code are shifted
+          toward adversarial regions of the representation space.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="impersonate-note">
+      These primitives are injected before virtualization. The VM then encrypts
+      and fragments them further. An LLM analyzing the final binary faces
+      <strong>adversarial inputs designed specifically for neural
+      architectures</strong>, wrapped inside a custom encrypted ISA it has
+      never seen in training data.
+    </div>
+
+    <div class="impersonate-note" style="margin-top: 10px;">
+      Combined with binary impersonation, every LLM tested to date
+      <strong>misidentifies the protection technology 100% of the time</strong>,
+      directing its entire analysis toward the wrong product.
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">03</span>
+    <h2>Per-Build Algorithm Synthesis</h2>
+    <p class="section-desc">
+      Traditional protectors use fixed algorithms with per-build keys.
+      Witness synthesizes the algorithms themselves. The cipher, the PRF,
+      and the ISA encoding are all generated fresh on every compilation.
+    </p>
+
+    <table class="synth-table">
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Traditional Protectors</th>
+          <th>Witness</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Stream Cipher</td>
+          <td>Fixed algorithm, per-build key</td>
+          <td>Entire construction synthesized per build. Internal structure, round count, and data routing are all unique</td>
+        </tr>
+        <tr>
+          <td>PRF Construction</td>
+          <td>Fixed structure (HMAC or similar)</td>
+          <td>Internal wiring synthesized per build. Not a parameterization of a known PRF</td>
+        </tr>
+        <tr>
+          <td>Hash Function</td>
+          <td>Fixed (SHA-256, CRC32, etc.)</td>
+          <td>Per-build constants and internal structure. A different hash on every compilation</td>
+        </tr>
+        <tr>
+          <td>PRNG</td>
+          <td>Fixed (Mersenne Twister, etc.)</td>
+          <td>Per-build parameterization that changes the algorithm's behavior, not just its seed</td>
+        </tr>
+        <tr>
+          <td>Opcode Encoding</td>
+          <td>Fixed opcode table, possibly permuted</td>
+          <td>Multiple encoding transforms applied per opcode. The bytecode format itself is unique</td>
+        </tr>
+        <tr>
+          <td>Dispatch Table</td>
+          <td>Fixed structure, encrypted entries</td>
+          <td>Self-mutating. Re-encrypted after every dispatch with per-build seeding</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="impersonate-note">
+      An attacker who fully reverse-engineers one build learns <strong>nothing
+      transferable</strong> to the next build. The algorithms themselves are different.
+      There is no "Witness cipher" to study. Every binary contains
+      a cipher that has never existed before and will never exist again.
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">04</span>
+    <h2>Language-Agnostic Protection</h2>
+    <p class="section-desc">
+      Operating at the LLVM IR level means any language that compiles through
+      LLVM is natively supported. No source rewriting, no language-specific
+      hooks, no binary rewriting.
+    </p>
+
+    <div class="lang-grid">
+      <div class="lang-badge">
+        <div class="lang-name">C</div>
+        <div class="lang-note">clang</div>
+      </div>
+      <div class="lang-badge">
+        <div class="lang-name">C++</div>
+        <div class="lang-note">clang++</div>
+      </div>
+      <div class="lang-badge">
+        <div class="lang-name">Rust</div>
+        <div class="lang-note">rustc (LLVM)</div>
+      </div>
+      <div class="lang-badge">
+        <div class="lang-name">Zig</div>
+        <div class="lang-note">zig cc</div>
+      </div>
+      <div class="lang-badge">
+        <div class="lang-name">D</div>
+        <div class="lang-note">ldc2</div>
+      </div>
+      <div class="lang-badge">
+        <div class="lang-name">Fortran</div>
+        <div class="lang-note">flang</div>
+      </div>
+      <div class="lang-badge">
+        <div class="lang-name">Objective-C</div>
+        <div class="lang-note">clang</div>
+      </div>
+    </div>
+
+    <div class="lang-compare">
+      <div class="lang-compare-title">Comparison with other protectors</div>
+      <div class="lang-compare-row">
+        <span class="lang-compare-name">VMProtect / Themida</span>
+        <span class="lang-compare-val">Binary-level. Post-compilation, no language awareness</span>
+      </div>
+      <div class="lang-compare-row">
+        <span class="lang-compare-name">Denuvo</span>
+        <span class="lang-compare-val">Binary-level. Post-compilation instrumentation and VM injection</span>
+      </div>
+      <div class="lang-compare-row">
+        <span class="lang-compare-name">Obfuscator-LLVM</span>
+        <span class="lang-compare-val">LLVM-level, but no virtualization (native-code transforms only). Systematically defeated by D810, Miasm, and angr. Forks reach LLVM 17-21</span>
+      </div>
+      <div class="lang-compare-row">
+        <span class="lang-compare-name">Witness</span>
+        <span class="lang-compare-val highlight">LLVM 22.x plugin. Any LLVM frontend, full ISA, C++ exceptions, atomics, SIMD</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">05</span>
+    <h2>Cryptographic Entanglement</h2>
+    <p class="section-desc">
+      Protection doesn't end at function boundaries. Cryptographic state
+      flows between functions, between invocations, and along execution
+      paths, creating dependencies that cannot be severed without
+      breaking everything at once.
+    </p>
+
+    <div class="entangle-grid">
+
+      <div class="entangle-card">
+        <div class="entangle-icon ic-rose">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <div class="entangle-title">Cross-Function Binding</div>
+        <div class="entangle-desc">
+          When multiple functions are protected, they share a persistent
+          cryptographic accumulator. Each function's execution folds a
+          fingerprint into this shared state. Tampering with function A
+          corrupts the decryption keys of functions B, C, and every other
+          entangled function. Silently.
+        </div>
+        <div class="entangle-tag">No known prior art</div>
+      </div>
+
+      <div class="entangle-card">
+        <div class="entangle-icon ic-amber">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>
+        </div>
+        <div class="entangle-title">Path-Sensitive State Binding</div>
+        <div class="entangle-desc">
+          The execution path is folded into the decryption key stream.
+          Reaching the same point via different paths produces different
+          keys. Forcing an alternate path doesn't just skip a check.
+          It makes every subsequent instruction decrypt to garbage.
+        </div>
+        <div class="entangle-tag">Advances environmental keying</div>
+      </div>
+
+      <div class="entangle-card">
+        <div class="entangle-icon ic-red">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        </div>
+        <div class="entangle-title">Cross-Invocation Mutation</div>
+        <div class="entangle-desc">
+          After each function invocation, the entire bytecode segment is
+          re-encrypted with a fresh key. A memory dump captured during one
+          call produces bytecode that is invalid for the next call. The
+          binary is literally different every time it runs.
+        </div>
+        <div class="entangle-tag">No known prior art</div>
+      </div>
+
+      <div class="entangle-card">
+        <div class="entangle-icon ic-violet">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="entangle-title">Load-Bearing Integrity</div>
+        <div class="entangle-desc">
+          Integrity verification is not a removable check. The values
+          produced during verification are mathematically required for
+          correct decryption of subsequent instructions. Patching out
+          a check doesn't skip it. It corrupts all downstream
+          computation with no error messages.
+        </div>
+        <div class="entangle-tag">No known prior art</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">06</span>
+    <h2>Algebraic Bytecode Encoding</h2>
+    <p class="section-desc">
+      Values in the VM don't just get XOR-masked. They pass through multiple
+      layers of algebraic encoding, each operating in a different mathematical
+      domain. Stripping one layer reveals another that requires entirely
+      different analysis techniques.
+    </p>
+
+    <div class="layer-stack">
+      <div class="stack-label" style="color: var(--muted);">Outermost Layer</div>
+
+      <div class="stack-node s-amber">
+        <div class="sn-title">Memory Layout Randomization</div>
+        <div class="sn-desc">
+          The VM register file is scattered across disjoint memory regions
+          with a per-invocation random permutation. The memory layout is
+          different every time the function is called.
+        </div>
+      </div>
+      <div class="stack-conn"></div>
+
+      <div class="stack-node s-rose">
+        <div class="sn-title">Value Domain Encoding</div>
+        <div class="sn-desc">
+          Every value in the data segment is encrypted with a position-dependent
+          block cipher. The same value at different offsets produces different
+          ciphertext. Keys rotate on every basic block transition.
+        </div>
+      </div>
+      <div class="stack-conn"></div>
+
+      <div class="stack-node s-violet">
+        <div class="sn-title">Secret-Shared Bytecode</div>
+        <div class="sn-desc">
+          Bytecode is split into multiple secret shares using a threshold
+          scheme. Shares are proactively re-randomized at execution
+          boundaries without changing the underlying secret. Phantom reads
+          ensure uniform memory access patterns.
+        </div>
+      </div>
+      <div class="stack-conn"></div>
+
+      <div class="stack-node s-red">
+        <div class="sn-title">Algebraic Matrix Encoding</div>
+        <div class="sn-desc">
+          Arithmetic operations are encoded as matrix-vector multiplications
+          in an algebraic number system. Consecutive operations are composed
+          into a single matrix multiply, making it impossible to identify
+          individual instructions from the bytecode.
+        </div>
+      </div>
+      <div class="stack-conn"></div>
+
+      <div class="stack-node s-emerald">
+        <div class="sn-title">Access Pattern Uniformization</div>
+        <div class="sn-desc">
+          Every real memory access is accompanied by phantom reads at
+          unpredictable offsets. Cache-timing and memory-trace side channels
+          see only uniform access patterns. The phantom pattern is unique
+          to each build.
+        </div>
+      </div>
+
+      <div class="stack-label" style="color: var(--muted);">Innermost Layer (plaintext exists only during handler execution)</div>
+
+      <div class="stack-note">
+        Each layer operates in a different mathematical domain. Stripping one
+        reveals another that requires entirely different analysis techniques.
+        Values are only meaningful within the context of a specific execution path.
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">07</span>
+    <h2>Architectural Innovations</h2>
+    <p class="section-desc">
+      Novel structural techniques in the VM runtime that break assumptions
+      made by dynamic analysis tools, debuggers, and memory forensics.
+    </p>
+
+    <div class="innov-grid">
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Split-Context VM Execution</div>
+        <div class="innov-desc">
+          The VM is split into two cooperative execution contexts: one that
+          fetches and pre-decrypts bytecode, and one that executes it. The two
+          contexts alternate. Single-stepping one shows no operations from the
+          other. Neither context alone reveals the program's behavior.
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">White-Box Key Encoding</div>
+        <div class="innov-desc">
+          The root secret key is encoded in multi-layer lookup tables with
+          affine encoding. A hardware-derived random mask is applied at every
+          lookup, preventing Differential Power Analysis from correlating
+          lookup indices with key bytes. The key never exists as a contiguous
+          plaintext array in memory.
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Call Stack Spoofing</div>
+        <div class="innov-desc">
+          The VM rewrites its call chain so stack unwinders see a clean,
+          legitimate-looking backtrace. Synthetic unwind metadata is generated
+          so the spoofed stack passes both debugger inspection and OS
+          exception dispatch.
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Memory-Hard Key Derivation</div>
+        <div class="innov-desc">
+          Key derivation uses a memory-hard function with a large working
+          buffer and data-dependent access patterns. This forces hardware
+          side-channel attackers to contend with unpredictable memory behavior
+          that defeats cache-line monitoring.
+        </div>
+      </div>
+
+      <div class="innov-card wide">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Recursive Self-Virtualization</div>
+        <div class="innov-desc">
+          Functions can be virtualized multiple times, creating nested VMs.
+          Each layer has independent encryption keys, independent dispatch
+          tables, and independent handler variants. An attacker who defeats
+          the outer VM faces a completely new inner VM with a different ISA,
+          different algorithms, and different keys.
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Surgical Opcode Subsetting</div>
+        <div class="innov-desc">
+          The VM instruction set is pruned per-build. Handlers for opcodes
+          the protected code never uses are completely stripped from the
+          binary. Each build contains a unique, minimal handler set. There
+          is no universal handler catalog to study, because every binary's
+          VM has a different instruction set.
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Full C++ Exception Virtualization</div>
+        <div class="innov-desc">
+          C++ try/catch/throw execute entirely within the VM. Every other
+          commercial protector exits to native code for exception handling,
+          exposing control flow at exception boundaries. Witness keeps
+          exception dispatch, stack unwinding, and catch matching inside the
+          encrypted interpreter. No native exception frames are visible.
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Variadic Function Virtualization</div>
+        <div class="innov-desc">
+          Variadic calling conventions are virtualized entirely inside the
+          VM. The argument list is captured at function entry and stored in
+          the encrypted data segment. Argument reads go through
+          double-indirection within the interpreter. Every other protector
+          exits to native code for variadic calls, exposing arguments and
+          calling conventions on the real stack.
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Load-Bearing Phantom Handlers</div>
+        <div class="innov-desc">
+          The dispatch table contains handlers that are never the target of
+          valid bytecode but are cryptographically entangled with the real
+          dispatch chain. Removing or modifying a phantom handler corrupts
+          the encryption state for all real handlers. They cannot be
+          identified via execution tracing (never dispatched) or stripped
+          via dead code elimination (load-bearing).
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Self-Mutating Dispatch Table</div>
+        <div class="innov-desc">
+          Handler positions in the dispatch table are physically shuffled
+          at runtime after every dispatch. A memory dump captured at one
+          point in execution shows a completely different table layout than
+          a dump captured moments later. All entries are re-encrypted with
+          fresh per-position keys periodically. No other protector mutates
+          the physical layout of its handler table during execution.
+        </div>
+      </div>
+
+      <div class="innov-card">
+        <div class="innov-badge">Novel</div>
+        <div class="innov-title">Page-Granular Key Derivation</div>
+        <div class="innov-desc">
+          Each 4KB code page is encrypted with its own unique key derived
+          from a master key and the page index. Pages are decrypted
+          on-demand via exception handler when first accessed. The derived
+          key is never stored after use. Compromising one decrypted page
+          reveals nothing about the keys of other pages. No other protector
+          combines per-page key derivation with on-demand exception-driven
+          decryption.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">08</span>
+    <h2>Post-Quantum Cryptography</h2>
+    <p class="section-desc">
+      The key derivation pipeline uses both classical and post-quantum
+      primitives. Even a quantum computer capable of breaking elliptic-curve
+      cryptography cannot extract the root key without also breaking
+      a lattice-based KEM.
+    </p>
+
+    <div class="crypto-grid">
+
+      <div class="crypto-card">
+        <div class="crypto-era classical">Classical</div>
+        <div class="crypto-name">Elliptic Curve</div>
+        <div class="crypto-role">
+          Ephemeral key exchange for hardware-bound per-function
+          share encryption. Private key material never leaves
+          the trusted execution boundary.
+        </div>
+        <div class="crypto-spec">ECDH + KDF</div>
+      </div>
+
+      <div class="crypto-card">
+        <div class="crypto-era modern">Memory-Hard</div>
+        <div class="crypto-name">Memory-Hard KDF</div>
+        <div class="crypto-role">
+          Large working buffer with data-dependent access patterns.
+          Resists GPU/ASIC acceleration and cache-timing side channels
+          from DCA/DFA attacks on white-box key extraction.
+        </div>
+        <div class="crypto-spec">Data-dependent access &middot; Explicit zeroing</div>
+      </div>
+
+      <div class="crypto-card">
+        <div class="crypto-era pq">Post-Quantum</div>
+        <div class="crypto-name">Lattice-Based KEM</div>
+        <div class="crypto-role">
+          A post-quantum key encapsulation mechanism augments the root
+          key after memory-hard stretching. Provides security against
+          quantum adversaries at the highest standardized level.
+        </div>
+        <div class="crypto-spec">NIST PQC Standard</div>
+      </div>
+
+    </div>
+
+    <div class="impersonate-note">
+      The root key derivation pipeline chains multiple cryptographic
+      stages. An attacker must defeat white-box encoding, memory-hard
+      stretching, and a post-quantum KEM, simultaneously, in the
+      correct order.
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <div class="doc-footer-nav">
+      <a href="ring0.html">&larr; Mode 3: Ring-0</a>
+    </div>
+    <img class="doc-footer-logo" src="../witness-logo.png" alt="Witness">
+    <div class="doc-footer-nav">
+      <a href="index.html">Mode 1: Standalone &rarr;</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  var c = document.getElementById('plexus');
+  var ctx = c.getContext('2d');
+  var seed = 0xF2B7;
+  var W, H, pts, edges, time = 0, raf;
+
+  function rng() { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; }
+
+  function init() {
+    W = c.width = window.innerWidth;
+    H = c.height = window.innerHeight;
+    seed = 0xF2B7;
+    var count = Math.max(60, Math.floor((W * H) / 12000));
+    pts = [];
+    for (var i = 0; i < count; i++) {
+      var hub = rng() < 0.08;
+      pts.push({
+        x: rng() * W, y: rng() * H,
+        vx: (rng() - 0.5) * 0.12,
+        vy: (rng() - 0.5) * 0.12,
+        r: hub ? 2 + rng() * 2 : 0.6 + rng() * 1,
+        phase: rng() * Math.PI * 2,
+        freq: 0.3 + rng() * 0.6,
+        hub: hub,
+        bright: hub ? 0.45 : 0.12
+      });
+    }
+    edges = [];
+    var maxDist = 140;
+    for (var i = 0; i < pts.length; i++) {
+      var cn = 0;
+      for (var j = i + 1; j < pts.length && cn < 5; j++) {
+        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        var lim = (pts[i].hub || pts[j].hub) ? maxDist * 1.3 : maxDist;
+        if (d < lim) { edges.push({ a: i, b: j, d: d, lim: lim }); cn++; }
+      }
+    }
+  }
+
+  function frame(ts) {
+    var dt = Math.min(0.05, (ts - time) / 1000);
+    time = ts;
+    ctx.clearRect(0, 0, W, H);
+
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < -10) p.x = W + 10;
+      if (p.x > W + 10) p.x = -10;
+      if (p.y < -10) p.y = H + 10;
+      if (p.y > H + 10) p.y = -10;
+    }
+
+    ctx.lineWidth = 0.4;
+    for (var i = 0; i < edges.length; i++) {
+      var e = edges[i];
+      var pa = pts[e.a], pb = pts[e.b];
+      var dx = pa.x - pb.x, dy = pa.y - pb.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d > e.lim * 1.2) continue;
+      var fade = 1 - d / (e.lim * 1.2);
+      var a = fade * 0.08;
+      var t = d / e.lim;
+      var cr = Math.round(244 - t * 40);
+      var cg = Math.round(114 + t * 77);
+      var cb = Math.round(182 - t * 60);
+      ctx.strokeStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + a + ')';
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+    }
+
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      var breathe = 1 + Math.sin(ts * 0.001 * p.freq + p.phase) * 0.25;
+      var r = p.r * breathe;
+      if (p.hub) {
+        var glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 4);
+        glow.addColorStop(0, 'rgba(244,114,182,0.12)');
+        glow.addColorStop(0.5, 'rgba(251,191,36,0.03)');
+        glow.addColorStop(1, 'rgba(244,114,182,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(244,114,182,' + (p.bright * breathe) + ')';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    raf = requestAnimationFrame(frame);
+  }
+
+  init();
+  raf = requestAnimationFrame(frame);
+  window.addEventListener('resize', function() { init(); });
+})();
+</script>
+</body>
+</html>

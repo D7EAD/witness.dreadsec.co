@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Witness: Ring-0 Enforcement</title>
+<meta name="description" content="Kernel-enforced binary protection with hardware-bound cryptographic binding and continuous integrity monitoring.">
+<meta name="theme-color" content="#060a11">
+<meta property="og:title" content="Witness: Ring-0 Enforcement">
+<meta property="og:description" content="Kernel-enforced binary protection with hardware-bound cryptographic binding and continuous integrity monitoring.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="../witness-logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Witness: Ring-0 Enforcement">
+<meta name="twitter:description" content="Kernel-enforced binary protection with hardware-bound cryptographic binding and continuous integrity monitoring.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a11;
+    --surface: #0c1219;
+    --surface2: #111a25;
+    --surface3: #162030;
+    --border: #1a2538;
+    --border-l: #243348;
+    --accent: #4e8eff;
+    --accent-dim: rgba(78,142,255,.08);
+    --violet: #9775fa;
+    --violet-dim: rgba(151,117,250,.08);
+    --emerald: #34d399;
+    --emerald-dim: rgba(52,211,153,.06);
+    --rose: #f472b6;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --text: #c9d1d9;
+    --text-bright: #e6edf3;
+    --muted: #5a6a7e;
+    --dim: #3d4f63;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ── Noise texture ── */
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── Plexus background ── */
+  #plexus {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    z-index: 0; pointer-events: none;
+  }
+
+  .page { max-width: 960px; margin: 0 auto; padding: 0 28px; }
+
+  /* ── Navigation ── */
+  .nav-bar {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+    margin-bottom: 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-brand { font-weight: 600; font-size: 14px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .nav-brand img { height: 20px; width: auto; }
+  .nav-parts { display: flex; gap: 4px; }
+  .nav-part {
+    font-size: 11.5px; padding: 6px 14px; border-radius: 6px; color: var(--muted);
+    text-decoration: none; font-weight: 500; transition: all 0.2s;
+  }
+  .nav-part:hover { color: var(--text); background: var(--surface2); }
+  .nav-part.active { color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(78,142,255,.15); }
+  .nav-home { border-right: 1px solid var(--border); margin-right: 4px; padding-right: 16px; }
+
+  /* ── Disclaimer ── */
+  .arch-disclaimer {
+    font-size: 9.5px; font-family: 'JetBrains Mono', monospace;
+    color: var(--dim); letter-spacing: 0.5px; opacity: 0.5;
+    padding-top: 10px;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 80px 0 60px;
+    text-align: center;
+    position: relative;
+  }
+  .hero::after {
+    content: ''; position: absolute; bottom: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-l), transparent);
+  }
+  .hero-badge {
+    display: inline-block; font-size: 10.5px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--violet);
+    background: var(--violet-dim); border: 1px solid rgba(151,117,250,.12);
+    padding: 5px 16px; border-radius: 20px; margin-bottom: 24px;
+  }
+  h1 {
+    font-size: 40px; font-weight: 700; line-height: 1.15; letter-spacing: -0.5px;
+    color: var(--text-bright);
+    margin-bottom: 16px;
+  }
+  h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--accent), var(--violet));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero-sub {
+    font-size: 16px; color: var(--muted); max-width: 560px; margin: 0 auto;
+    line-height: 1.7; font-weight: 300;
+  }
+
+  /* ── Section headers ── */
+  .section { padding: 56px 0; position: relative; }
+  .section + .section { border-top: 1px solid var(--border); }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500;
+    color: var(--dim); letter-spacing: 1px; margin-bottom: 8px; display: block;
+  }
+  h2 {
+    font-size: 24px; font-weight: 600; color: var(--text-bright); margin-bottom: 10px;
+    letter-spacing: -0.3px;
+  }
+  .section-desc { font-size: 14px; color: var(--muted); max-width: 520px; margin-bottom: 36px; }
+
+  /* ── Trust Boundary ── */
+  .boundary {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .boundary-half { padding: 32px 28px; }
+  .boundary-half.ring3 { background: var(--accent-dim); border-right: 1px solid var(--border); }
+  .boundary-half.ring0 { background: var(--violet-dim); }
+  .boundary-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .boundary-label.r3 { color: var(--accent); }
+  .boundary-label.r0 { color: var(--violet); }
+  .boundary-label .ring-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .boundary-label.r3 .ring-dot { background: var(--accent); }
+  .boundary-label.r0 .ring-dot { background: var(--violet); }
+  .boundary-items { list-style: none; }
+  .boundary-items li {
+    font-size: 13px; color: var(--text); padding: 5px 0;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .boundary-items li::before {
+    content: ''; width: 4px; height: 4px; border-radius: 1px;
+    margin-top: 8px; flex-shrink: 0;
+  }
+  .boundary-half.ring3 .boundary-items li::before { background: var(--accent); }
+  .boundary-half.ring0 .boundary-items li::before { background: var(--violet); }
+  .boundary-note {
+    font-size: 11px; color: var(--dim); text-align: center; margin-top: 6px;
+    font-style: italic;
+  }
+
+  /* ── Sequence diagram ── */
+  .seq { margin-top: 8px; }
+  .seq-phase {
+    display: grid; grid-template-columns: 1fr 140px 1fr;
+    margin-bottom: 0; position: relative;
+  }
+  .seq-phase-header {
+    grid-column: 1 / -1; text-align: center;
+    padding: 20px 0 12px; position: relative;
+  }
+  .seq-phase-header::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 50%;
+    height: 1px; background: var(--border);
+  }
+  .seq-phase-tag {
+    display: inline-block; position: relative; z-index: 1;
+    background: var(--bg); padding: 4px 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; border: 1px solid var(--border);
+    border-radius: 5px;
+  }
+  .seq-phase-tag.t1 { color: var(--amber); border-color: rgba(251,191,36,.2); }
+  .seq-phase-tag.t2 { color: var(--accent); border-color: rgba(78,142,255,.2); }
+  .seq-phase-tag.t3 { color: var(--emerald); border-color: rgba(52,211,153,.2); }
+  .seq-phase-tag.t4 { color: var(--violet); border-color: rgba(151,117,250,.2); }
+  .seq-phase-tag.t5 { color: var(--red); border-color: rgba(248,113,113,.2); }
+  .seq-phase-tag.t6 { color: var(--rose); border-color: rgba(244,114,182,.2); }
+
+  .seq-col-headers {
+    display: grid; grid-template-columns: 1fr 140px 1fr;
+    margin-bottom: 4px; padding: 0 4px;
+  }
+  .seq-col-h {
+    text-align: center; font-size: 11px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase; padding: 12px 8px;
+    border-radius: 8px;
+  }
+  .seq-col-h.app { color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(78,142,255,.1); }
+  .seq-col-h.mid { color: var(--dim); background: transparent; border: none; font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none; display: flex; align-items: center; justify-content: center; }
+  .seq-col-h.drv { color: var(--violet); background: var(--violet-dim); border: 1px solid rgba(151,117,250,.1); }
+
+  .seq-body { position: relative; padding: 0 4px; }
+
+  .seq-row {
+    display: grid; grid-template-columns: 1fr 140px 1fr;
+    align-items: start; margin: 10px 0; min-height: 40px;
+  }
+  .seq-side {
+    padding: 10px 14px; border-radius: 8px;
+    font-size: 12px; line-height: 1.55;
+  }
+  .seq-side.left { background: rgba(78,142,255,.04); border: 1px solid rgba(78,142,255,.08); margin-right: 8px; }
+  .seq-side.right { background: rgba(151,117,250,.04); border: 1px solid rgba(151,117,250,.08); margin-left: 8px; }
+  .seq-side .st { font-weight: 600; color: var(--text-bright); font-size: 12px; margin-bottom: 3px; }
+  .seq-side .sd { color: var(--muted); font-size: 11.5px; }
+
+  .seq-arrow { display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 8px; }
+  .seq-arrow-name { font-size: 10.5px; font-weight: 600; margin-bottom: 6px; white-space: nowrap; }
+  .seq-arrow-name.send { color: var(--accent); }
+  .seq-arrow-name.recv { color: var(--violet); }
+  .seq-arrow-line { width: 100%; height: 2px; position: relative; }
+  .seq-arrow-line.fwd { background: linear-gradient(to right, rgba(78,142,255,.6), rgba(151,117,250,.6)); }
+  .seq-arrow-line.bck { background: linear-gradient(to left, rgba(78,142,255,.6), rgba(151,117,250,.6)); }
+  .seq-arrow-line.fwd::after { content: ''; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 6px solid rgba(151,117,250,.7); }
+  .seq-arrow-line.bck::after { content: ''; position: absolute; left: -1px; top: -4px; border: 5px solid transparent; border-right: 6px solid rgba(78,142,255,.7); }
+
+  .seq-note {
+    grid-column: 1 / -1; margin: 4px 20px 8px;
+    padding: 8px 16px; border-radius: 6px; font-size: 11px;
+    color: var(--muted); line-height: 1.5;
+    background: var(--surface); border: 1px dashed var(--border);
+    text-align: center;
+  }
+  .seq-note-wide { text-align: left; max-width: 680px; margin-left: auto; margin-right: auto; }
+
+  .seq-loop {
+    border: 1px dashed var(--border-l); border-radius: 10px;
+    padding: 14px 8px; margin: 6px 0; position: relative;
+  }
+  .seq-loop-label {
+    position: absolute; top: -8px; left: 16px;
+    background: var(--bg); padding: 0 10px;
+    font-size: 9.5px; font-weight: 600; color: var(--amber);
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+
+  /* ── Defense Layers ── */
+  .layers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .layers-grid { grid-template-columns: 1fr; } }
+  .layer-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px;
+    transition: border-color 0.25s, background 0.25s;
+  }
+  .layer-card:hover { border-color: var(--border-l); background: var(--surface2); }
+  .layer-card.wide { grid-column: 1 / -1; }
+  .layer-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px; font-size: 16px;
+  }
+  .layer-icon.ic-integrity { background: rgba(52,211,153,.08); color: var(--emerald); border: 1px solid rgba(52,211,153,.12); }
+  .layer-icon.ic-debug { background: rgba(248,113,113,.08); color: var(--red); border: 1px solid rgba(248,113,113,.12); }
+  .layer-icon.ic-instr { background: rgba(251,191,36,.08); color: var(--amber); border: 1px solid rgba(251,191,36,.12); }
+  .layer-icon.ic-tamper { background: rgba(78,142,255,.08); color: var(--accent); border: 1px solid rgba(78,142,255,.12); }
+  .layer-icon.ic-dump { background: rgba(244,114,182,.08); color: var(--rose); border: 1px solid rgba(244,114,182,.12); }
+  .layer-icon.ic-inject { background: rgba(151,117,250,.08); color: var(--violet); border: 1px solid rgba(151,117,250,.12); }
+  .layer-title { font-size: 15px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .layer-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .layer-tags { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .layer-tag {
+    font-size: 10px; font-weight: 500; padding: 3px 10px; border-radius: 4px;
+    background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--dim);
+  }
+
+  /* ── Attack Surface ── */
+  .attack-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+  @media (max-width: 700px) { .attack-grid { grid-template-columns: 1fr; } }
+  .attack-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; position: relative; overflow: hidden;
+  }
+  .attack-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .attack-card.fail::before { background: var(--red); opacity: 0.5; }
+  .attack-card.partial::before { background: var(--amber); opacity: 0.5; }
+  .attack-scenario { font-size: 12px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px; }
+  .attack-has { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
+  .attack-has strong { color: var(--text); font-weight: 500; }
+  .attack-result {
+    font-size: 11.5px; font-weight: 600; padding: 5px 10px;
+    border-radius: 5px; display: inline-block;
+  }
+  .attack-result.blocked { background: rgba(248,113,113,.1); color: var(--red); border: 1px solid rgba(248,113,113,.12); }
+  .attack-result.degraded { background: rgba(251,191,36,.1); color: var(--amber); border: 1px solid rgba(251,191,36,.12); }
+  .attack-why { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.5; }
+
+  /* ── Properties ── */
+  .props-list { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .props-list { grid-template-columns: 1fr 1fr; } }
+  .prop {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px;
+  }
+  .prop-name {
+    font-size: 13px; font-weight: 600; color: var(--text-bright); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .prop-check { color: var(--emerald); font-size: 14px; }
+  .prop-desc { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+  /* ── Footer ── */
+  .doc-footer {
+    margin-top: 56px; padding: 24px 0;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; position: relative;
+  }
+  .doc-footer-logo { position: absolute; left: 50%; transform: translateX(-50%); }
+  .doc-footer-logo { height: 18px; width: auto; opacity: 0.35; }
+  .doc-footer-nav { display: flex; gap: 4px; }
+  .doc-footer-nav a {
+    font-size: 11px; color: var(--muted); text-decoration: none;
+    padding: 5px 12px; border-radius: 5px; border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .doc-footer-nav a:hover { color: var(--text); border-color: var(--border-l); background: var(--surface); }
+
+  /* ── Responsive: tablet ── */
+  @media (max-width: 700px) {
+    .page { padding: 0 16px; }
+    .nav-bar { flex-direction: column; gap: 12px; align-items: flex-start; }
+    .nav-parts { flex-wrap: wrap; gap: 4px; }
+    .nav-part { font-size: 11px; padding: 5px 10px; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; }
+    .hero { padding: 48px 0 36px; }
+    .hero-sub { font-size: 14px; max-width: 100%; }
+    .section { padding: 36px 0; }
+    .section-desc { font-size: 13px; margin-bottom: 24px; }
+    .boundary { grid-template-columns: 1fr; }
+    .boundary-half { padding: 24px 20px; }
+    .boundary-half.ring3 { border-right: none; border-bottom: 1px solid var(--border); }
+    .seq-phase, .seq-row, .seq-col-headers { grid-template-columns: 1fr; }
+    .seq-arrow, .seq-col-h.mid { display: none; }
+    .seq-side { margin: 4px 0 !important; }
+    .seq-note { margin: 4px 0 8px; padding: 8px 12px; font-size: 11px; max-width: 100% !important; }
+    .seq-loop { padding: 12px 6px; }
+    .seq-loop-label { left: 10px; font-size: 9px; }
+    .seq-col-h { font-size: 10px; padding: 10px 6px; }
+    .attack-card { padding: 16px; }
+    .layer-card { padding: 20px; }
+    .layer-desc { font-size: 12px; }
+    .prop { padding: 16px; }
+    .prop-desc { font-size: 11.5px; }
+    .props-list { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .doc-footer { flex-direction: column; gap: 12px; align-items: center; text-align: center; }
+  }
+
+  /* ── Responsive: phone ── */
+  @media (max-width: 480px) {
+    .page { padding: 0 12px; }
+    .nav-brand { font-size: 12px; }
+    .nav-parts { width: 100%; }
+    .nav-part { flex: 1; text-align: center; font-size: 10px; padding: 6px 4px; white-space: nowrap; }
+    h1 { font-size: 24px; }
+    .hero-badge { font-size: 9.5px; padding: 4px 12px; letter-spacing: 1.5px; }
+    .section { padding: 28px 0; }
+    .boundary-half { padding: 20px 14px; }
+    .boundary-items li { font-size: 12px; }
+    .attack-grid { gap: 10px; }
+    .attack-card { padding: 14px; }
+    .attack-scenario { font-size: 11.5px; }
+    .attack-has { font-size: 11px; }
+    .attack-result { font-size: 11px; padding: 4px 8px; }
+    .attack-why { font-size: 10.5px; }
+    .layers-grid { gap: 10px; }
+    .layer-card { padding: 16px; }
+    .layer-title { font-size: 14px; }
+    .layer-desc { font-size: 11.5px; }
+    .layer-tag { font-size: 9px; padding: 2px 8px; }
+    .props-list { grid-template-columns: 1fr; gap: 8px; }
+    .prop { padding: 14px; }
+    .prop-name { font-size: 12px; }
+    .prop-desc { font-size: 11px; }
+    .doc-footer { margin-top: 36px; padding: 20px 0; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="plexus"></canvas>
+
+<div class="page">
+
+  <nav class="nav-bar">
+    <div class="nav-brand"><img src="../witness-logo.png" alt="Witness"> Architecture</div>
+    <div class="nav-parts">
+      <a class="nav-part nav-home" href="https://witness.dreadsec.co">Home</a>
+      <a class="nav-part" href="index.html">Mode 1: Standalone</a>
+      <a class="nav-part" href="drm.html">Mode 2: Always-Online DRM</a>
+      <a class="nav-part" href="ring0.html">Mode 3: Ring-0 Enforcement</a>
+      <a class="nav-part" href="novelty.html">Novelty</a>
+    </div>
+  </nav>
+  <div class="arch-disclaimer">details left ambiguous to prevent pre-analysis</div>
+
+  <header class="hero">
+    <div class="hero-badge">Architecture &middot; Mode 3 of 3</div>
+    <h1>Ring-0 Enforced<br><em>Binary Protection</em></h1>
+    <p class="hero-sub">
+      A signed kernel driver binds protected binaries to a specific machine
+      at the hardware level. The binary cannot execute on any other machine,
+      even if both the binary and the driver itself are exfiltrated.
+      All Mode 1 protections are included by default. Ring-0 and DRM are
+      mutually exclusive &ndash; choose one or the other on top of the
+      standalone foundation.
+    </p>
+  </header>
+
+  <div class="section">
+    <span class="section-num">01</span>
+    <h2>Why Ring-0?</h2>
+    <p class="section-desc">
+      Ring-0 enforcement is supplemental. All standalone Witness protections
+      (virtualization, encrypted bytecode, anti-tamper, integrity chaining)
+      are included by default. The kernel driver adds a hardware-bound
+      layer on top that prevents exfiltration even by sophisticated attackers
+      with full access to the binary.
+    </p>
+
+    <div class="boundary">
+      <div class="boundary-half ring3">
+        <div class="boundary-label r3"><span class="ring-dot"></span> The Binary (Ring 3)</div>
+        <ul class="boundary-items">
+          <li>Contains encrypted bytecode and the VM interpreter</li>
+          <li>Holds per-function encrypted key shares embedded at compile time</li>
+          <li>Cannot derive decryption keys without the driver's private key</li>
+          <li>Reports integrity proofs to the driver during execution</li>
+        </ul>
+      </div>
+      <div class="boundary-half ring0">
+        <div class="boundary-label r0"><span class="ring-dot"></span> The Driver (Ring 0)</div>
+        <ul class="boundary-items">
+          <li>Holds an asymmetric private key derived from hardware fingerprints</li>
+          <li>Decrypts per-function shares that unlock VM execution</li>
+          <li>Private key is non-exportable and bound to physical hardware</li>
+          <li>Verifies binary integrity and system security posture continuously</li>
+        </ul>
+      </div>
+    </div>
+    <div class="boundary-note">
+      The binary and driver communicate through a covert channel with no user-visible endpoints.
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">02</span>
+    <h2>Attack Surface</h2>
+    <p class="section-desc">
+      What happens when an attacker exfiltrates parts of the system?
+      Every scenario results in a non-functional binary.
+    </p>
+
+    <div class="attack-grid">
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Binary Only</div>
+        <div class="attack-has">Attacker copies the protected executable to another machine.</div>
+        <div class="attack-result blocked">Cannot execute</div>
+        <div class="attack-why">
+          Each protected function requires a cryptographic share that only the
+          original machine's driver can provide. Without the share, the VM's key
+          derivation produces garbage. Every function call returns wrong results or crashes.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Binary + Driver</div>
+        <div class="attack-has">Attacker copies both the executable and the kernel driver to another machine.</div>
+        <div class="attack-result blocked">Cannot execute</div>
+        <div class="attack-why">
+          The driver's private key is derived from hardware fingerprints unique to the
+          original machine. On different hardware, the driver generates a different keypair.
+          The encrypted shares in the binary were sealed to the original public key
+          and cannot be decrypted by a different private key.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Binary + Driver + Disk Clone</div>
+        <div class="attack-has">Attacker clones the entire disk (OS, registry, driver state) to new hardware.</div>
+        <div class="attack-result blocked">Cannot execute</div>
+        <div class="attack-why">
+          The private key is never persisted to disk. It is derived at driver load time from
+          CPU, motherboard, and storage identifiers that cannot be cloned. New hardware
+          produces a new identity. The embedded shares remain undecryptable.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Binary + Patched Driver</div>
+        <div class="attack-has">Attacker modifies the driver to return fake shares.</div>
+        <div class="attack-result blocked">Cannot execute</div>
+        <div class="attack-why">
+          Shares are encrypted with authenticated key exchange at compile time. The driver
+          must possess the correct private key to decrypt them. A fake share produces the
+          wrong VM decryption keys. Additionally, modified drivers fail code signing
+          enforcement and will not load on systems with Secure Boot enabled.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Memory Dump</div>
+        <div class="attack-has">Attacker dumps process memory to extract decrypted bytecode or keys.</div>
+        <div class="attack-result blocked">Detected and prevented</div>
+        <div class="attack-why">
+          The driver strips memory read/write access from external processes at the kernel
+          level. Bytecode is re-encrypted between invocations. Anti-dump tripwires detect
+          memory scanning. Attaching a debugger triggers immediate termination from Ring 0.
+        </div>
+      </div>
+
+      <div class="attack-card fail">
+        <div class="attack-scenario">Kernel Debugger</div>
+        <div class="attack-has">Attacker boots with a kernel debugger to intercept driver operations.</div>
+        <div class="attack-result blocked">Refused at load</div>
+        <div class="attack-why">
+          The driver detects kernel debugging and degraded code integrity at boot time.
+          Sessions are refused before any key material is exchanged. Disabling system
+          security policies is also detected and blocks execution.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">03</span>
+    <h2>Protocol Lifecycle</h2>
+    <p class="section-desc">
+      A multi-phase protocol establishes and maintains the trust relationship
+      between the protected binary and the kernel driver.
+    </p>
+
+    <div class="seq">
+      <div class="seq-col-headers">
+        <div class="seq-col-h app">Protected Binary</div>
+        <div class="seq-col-h mid">covert channel</div>
+        <div class="seq-col-h drv">Kernel Driver</div>
+      </div>
+
+      <div class="seq-body">
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t1">Enrollment</span></div>
+
+        <div class="seq-note">
+          One-time machine binding. The driver generates an asymmetric keypair derived from
+          hardware identifiers. The public key becomes the machine identity; the private key
+          never leaves kernel memory.
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t6">Build Pipeline</span></div>
+
+        <div class="seq-note seq-note-wide">
+          The developer provides the machine's public key to the compiler.
+          For each protected function, the compiler:
+          <br><br>
+          <strong>1.</strong> Generates a random key share and XORs it into the function's root encryption key.
+          Without this share, the VM produces garbage output.<br>
+          <strong>2.</strong> Encrypts the share to the machine's public key using ephemeral authenticated key exchange.
+          Only the matching private key can recover it.<br>
+          <strong>3.</strong> Embeds the encrypted share and ephemeral public key into the binary as per-function data.<br>
+          <strong>4.</strong> Generates a unique build identity and binary integrity hash, embedded as a marker
+          the driver uses to identify and verify the binary at launch.
+          <br><br>
+          The resulting binary is permanently bound to the target machine.
+          It contains everything needed to request its shares at runtime, but nothing
+          that allows recovering them without the driver's private key.
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t2">Mutual Authentication</span></div>
+
+        <div class="seq-row">
+          <div class="seq-side left">
+            <div class="st">Initiate Connection</div>
+            <div class="sd">Generate fresh nonce, present build identity embedded at compile time</div>
+          </div>
+          <div class="seq-arrow">
+            <span class="seq-arrow-name send">identity proof</span>
+            <div class="seq-arrow-line fwd"></div>
+          </div>
+          <div class="seq-side right">
+            <div class="st">Validate Binary</div>
+            <div class="sd">Verify build identity, check binary integrity, confirm system security posture</div>
+          </div>
+        </div>
+
+        <div class="seq-row">
+          <div class="seq-side left">
+            <div class="st">Verify Driver</div>
+            <div class="sd">Authenticate the driver's challenge using the derived handshake key</div>
+          </div>
+          <div class="seq-arrow">
+            <span class="seq-arrow-name recv">challenge</span>
+            <div class="seq-arrow-line bck"></div>
+          </div>
+          <div class="seq-side right">
+            <div class="st">Issue Challenge</div>
+            <div class="sd">Generate server nonce, derive handshake key, produce authenticated challenge</div>
+          </div>
+        </div>
+
+        <div class="seq-row">
+          <div class="seq-side left">
+            <div class="st">Complete Handshake</div>
+            <div class="sd">Derive session key, wipe ephemeral material</div>
+          </div>
+          <div class="seq-arrow">
+            <span class="seq-arrow-name send">response</span>
+            <div class="seq-arrow-line fwd"></div>
+          </div>
+          <div class="seq-side right">
+            <div class="st">Activate Session</div>
+            <div class="sd">Derive matching session key, activate all kernel-side defense mechanisms</div>
+          </div>
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t3">Per-Function Key Exchange</span></div>
+
+        <div class="seq-loop">
+          <span class="seq-loop-label">each protected function</span>
+
+          <div class="seq-row">
+            <div class="seq-side left">
+              <div class="st">Request Key Share</div>
+              <div class="sd">Present compile-time encrypted share material with authenticated request</div>
+            </div>
+            <div class="seq-arrow">
+              <span class="seq-arrow-name send">share request</span>
+              <div class="seq-arrow-line fwd"></div>
+            </div>
+            <div class="seq-side right">
+              <div class="st">Decrypt Share</div>
+              <div class="sd">Use private key to recover per-function share, re-encrypt for transit</div>
+            </div>
+          </div>
+
+          <div class="seq-row">
+            <div class="seq-side left">
+              <div class="st">Apply Share</div>
+              <div class="sd">Decrypt transit layer, XOR share into VM key derivation &ndash; function becomes executable</div>
+            </div>
+            <div class="seq-arrow">
+              <span class="seq-arrow-name recv">share response</span>
+              <div class="seq-arrow-line bck"></div>
+            </div>
+            <div class="seq-side right">
+              <div class="st">Transit Encrypt</div>
+              <div class="sd">Apply authenticated session-bound encryption before returning share</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t4">Continuous Monitoring</span></div>
+
+        <div class="seq-loop">
+          <span class="seq-loop-label">periodic</span>
+
+          <div class="seq-row">
+            <div class="seq-side left">
+              <div class="st">Heartbeat</div>
+              <div class="sd">Transmit runtime integrity signals and execution proofs as authenticated message</div>
+            </div>
+            <div class="seq-arrow">
+              <span class="seq-arrow-name send">integrity proof</span>
+              <div class="seq-arrow-line fwd"></div>
+            </div>
+            <div class="seq-side right">
+              <div class="st">Validate &amp; Monitor</div>
+              <div class="sd">Verify proof, run detection checks, reset watchdog timer, periodically re-verify binary</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="seq-phase-header"><span class="seq-phase-tag t5">Enforcement</span></div>
+
+        <div class="seq-note">
+          Any trust violation &ndash; binary tampering, debugger attachment, instrumentation injection,
+          expired watchdog, or failed authentication &ndash; results in immediate process termination
+          from kernel privilege. No user-mode bypass is possible.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">04</span>
+    <h2>Defense Layers</h2>
+    <p class="section-desc">
+      Six independent protection layers operate concurrently across both privilege rings.
+      Defeating one layer does not weaken the others.
+    </p>
+
+    <div class="layers-grid">
+
+      <div class="layer-card">
+        <div class="layer-icon ic-integrity"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <div class="layer-title">Binary Integrity</div>
+        <div class="layer-desc">
+          The kernel continuously verifies the code section of the protected binary.
+          Any modification &ndash; patches, hooks, or injected code &ndash; is detected
+          and results in immediate termination.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Ring 0</span>
+          <span class="layer-tag">Continuous</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-debug"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 12H6M12 6v12M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><line x1="4" y1="4" x2="20" y2="20" stroke-width="2.5"/></svg></div>
+        <div class="layer-title">Anti-Debug</div>
+        <div class="layer-desc">
+          Multiple kernel-level checks detect attached debuggers, kernel debuggers,
+          hardware breakpoints, and weakened system security policies. Checks run at
+          intervals invisible to user-mode.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Ring 0</span>
+          <span class="layer-tag">Periodic</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-instr"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg></div>
+        <div class="layer-title">Anti-Instrumentation</div>
+        <div class="layer-desc">
+          Detects and defeats dynamic binary instrumentation frameworks, hardware trace
+          facilities, taint analysis, and memory access profiling. Operates through both
+          kernel detection and user-mode countermeasures.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Ring 0 + Ring 3</span>
+          <span class="layer-tag">Per-dispatch</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-tamper"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+        <div class="layer-title">Anti-Tamper</div>
+        <div class="layer-desc">
+          Integrity is woven into every operation. Execution path, control flow history,
+          and bytecode state are continuously hashed into load-bearing cryptographic
+          values. Tampering silently corrupts all future computation.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Ring 3</span>
+          <span class="layer-tag">Every operation</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-inject"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9"/></svg></div>
+        <div class="layer-title">Anti-Injection</div>
+        <div class="layer-desc">
+          The kernel strips dangerous access rights from any external process attempting
+          to open handles to the protected process or its threads. Return addresses are
+          cryptographically verified to guard against control flow hijacking.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Ring 0</span>
+          <span class="layer-tag">On handle open</span>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-icon ic-dump"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4m4-5l5 5 5-5m-5 5V3"/></svg></div>
+        <div class="layer-title">Anti-Dump</div>
+        <div class="layer-desc">
+          Memory scanning and process dumping are detected through integrity-verified memory regions.
+          Environment fingerprinting detects VM and sandbox execution. Private keys are
+          scrubbed from kernel memory on system failure before crash dumps are written.
+        </div>
+        <div class="layer-tags">
+          <span class="layer-tag">Ring 0 + Ring 3</span>
+          <span class="layer-tag">Passive</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="section">
+    <span class="section-num">05</span>
+    <h2>Security Properties</h2>
+    <p class="section-desc">
+      The combination of kernel-resident private key, per-function isolation,
+      and continuous verification produces the following guarantees.
+    </p>
+
+    <div class="props-list">
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Per-Machine Binding</div>
+        <div class="prop-desc">
+          Each machine generates a unique asymmetric keypair from
+          hardware identifiers. Binaries compiled for one machine
+          cannot execute on another.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Per-Function Isolation</div>
+        <div class="prop-desc">
+          Every protected function receives an independent cryptographic
+          share. Recovering one function's key material does not
+          compromise any other function.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Forward Secrecy</div>
+        <div class="prop-desc">
+          Ephemeral key material is generated per function at compile time
+          and wiped after use. Past sessions cannot be decrypted if the
+          long-term key is compromised.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Continuous Verification</div>
+        <div class="prop-desc">
+          The driver periodically re-verifies binary integrity and system
+          security posture. Protection is not a one-time check &ndash;
+          it is maintained throughout execution.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Covert Communication</div>
+        <div class="prop-desc">
+          The user-kernel channel uses no named pipes, IOCTLs, or device
+          objects. Standard monitoring tools cannot observe or intercept
+          the protocol.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Kernel-Level Enforcement</div>
+        <div class="prop-desc">
+          All termination decisions execute at Ring 0 privilege. User-mode
+          code cannot intercept, delay, or prevent enforcement actions.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Split-Secret Architecture</div>
+        <div class="prop-desc">
+          The VM's root key is split between the binary and the driver.
+          Neither side holds enough material to derive decryption keys
+          independently. Both must cooperate.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Mutual Authentication</div>
+        <div class="prop-desc">
+          Both the binary and driver prove their identity before any key
+          material is exchanged. Neither a rogue binary nor a rogue driver
+          can extract shares.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Dual Enforcement</div>
+        <div class="prop-desc">
+          User-mode anti-tamper silently corrupts computation, making
+          the point of detection ambiguous. Kernel-level violations
+          trigger immediate termination from Ring 0. Attackers face
+          both strategies simultaneously.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Cross-Function Entanglement</div>
+        <div class="prop-desc">
+          Protected functions share persistent cryptographic state.
+          Each function's execution feeds entropy into a shared
+          accumulator. Breaking one function's protection corrupts
+          the others.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Thread Safety</div>
+        <div class="prop-desc">
+          All VM state is thread-local. Protected functions are fully
+          reentrant and can execute concurrently across any number
+          of threads without synchronization.
+        </div>
+      </div>
+
+      <div class="prop">
+        <div class="prop-name"><span class="prop-check">&#10003;</span> Binary Impersonation</div>
+        <div class="prop-desc">
+          The binary's PE structure can be reshaped to match the
+          forensic signatures of other commercial protectors,
+          misdirecting automated classification tools.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="doc-footer">
+    <div class="doc-footer-nav">
+      <a href="drm.html">&larr; Mode 2: Always-Online DRM</a>
+    </div>
+    <img class="doc-footer-logo" src="../witness-logo.png" alt="Witness">
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  var c = document.getElementById('plexus');
+  var ctx = c.getContext('2d');
+  var seed = 0xA7B3;
+  function rng() { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; }
+
+  function draw() {
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+    var w = c.width, h = c.height;
+    var pts = [];
+    var spacing = 110;
+    var cols = Math.ceil(w / spacing) + 2;
+    var rows = Math.ceil(h / spacing) + 2;
+    seed = 0xA7B3;
+    for (var r = 0; r < rows; r++) {
+      for (var cl = 0; cl < cols; cl++) {
+        var x = cl * spacing + (r % 2 ? spacing * 0.5 : 0) + (rng() - 0.5) * 50;
+        var y = r * spacing + (rng() - 0.5) * 50;
+        pts.push({ x: x, y: y, s: 1 + rng() * 1.8 });
+      }
+    }
+    var maxDist = 160;
+    ctx.lineWidth = 0.5;
+    for (var i = 0; i < pts.length; i++) {
+      for (var j = i + 1; j < pts.length; j++) {
+        var dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        if (d < maxDist) {
+          var a = (1 - d / maxDist) * 0.12;
+          var t = d / maxDist;
+          var cr = Math.round(78 + t * 73);
+          var cg = Math.round(142 - t * 25);
+          var cb = Math.round(255 - t * 5);
+          ctx.strokeStyle = 'rgba(' + cr + ',' + cg + ',' + cb + ',' + a + ')';
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[j].x, pts[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      ctx.fillStyle = 'rgba(151, 117, 250, 0.2)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  draw();
+  window.addEventListener('resize', draw);
+})();
+</script>
+</body>
+</html>
