@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Witness</title>
-<meta name="description" content="Exploiting LLVM for novel code protection. Zero dependencies. One line. Code disappears.">
+<meta name="description" content="Exploiting LLVM for code protection. One annotation. Your function disappears.">
 <meta property="og:title" content="Witness">
-<meta property="og:description" content="Exploiting LLVM for novel code protection. Zero dependencies. One line. Code disappears.">
+<meta property="og:description" content="Exploiting LLVM for code protection. One annotation. Your function disappears.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Witness">
-<meta name="twitter:description" content="Exploiting LLVM for novel code protection. Zero dependencies. One line. Code disappears.">
+<meta name="twitter:description" content="Exploiting LLVM for code protection. One annotation. Your function disappears.">
 <meta name="theme-color" content="#050208">
 <link rel="icon" type="image/png" href="witness-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -191,7 +191,7 @@ main {
 }
 
 .hero {
-  min-height: 100vh;
+  min-height: 70vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -327,6 +327,32 @@ section { padding: clamp(1.5rem, 4vh, 3rem) 0; }
   margin-top: 0.8rem;
   text-align: center;
 }
+.arch-btn {
+  display: inline-block; margin-top: 1.6rem;
+  font-family: 'Share Tech Mono', monospace; font-size: 0.75rem;
+  color: var(--red); border: 1px solid var(--red);
+  padding: 0.6rem 1.6rem; border-radius: 4px;
+  text-decoration: none; letter-spacing: 1.5px; text-transform: uppercase;
+  transition: background 0.25s, color 0.25s;
+}
+.arch-btn:hover { background: var(--red); color: #fff; }
+.arch-stack {
+  position: relative; width: 1100px; max-width: 100%;
+  margin: 0 auto; aspect-ratio: 16/12;
+}
+.arch-stack a {
+  position: absolute; border-radius: 8px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.08);
+  transition: opacity 0.35s, transform 0.35s, z-index 0s;
+  width: 90%;
+}
+.arch-stack a img {
+  display: block; width: 100%; height: 100%; object-fit: cover;
+}
+.arch-stack .layer-0 { top: 0; left: 0; opacity: 0.3; z-index: 1; }
+.arch-stack .layer-1 { top: 5%; left: 5%; opacity: 0.55; z-index: 2; }
+.arch-stack .layer-2 { top: 12%; left: 18%; opacity: 0.9; z-index: 3; width: 80%; }
+.arch-stack a:hover { opacity: 1; z-index: 10; transform: scale(1.02); border-color: rgba(255,255,255,.2); }
 
 .code-block .kw { color: var(--red); }
 .code-block .str { color: var(--cyan); }
@@ -647,7 +673,7 @@ footer {
 
 /* ---- Mobile general ---- */
 @media (max-width: 480px) {
-  .hero { min-height: 90vh; min-height: 90dvh; }
+  .hero { min-height: 60vh; min-height: 60dvh; }
   .hero-title { word-break: break-word; }
   .cta-quote { letter-spacing: 0.02em; }
   .about-text { max-width: 100%; padding: 0 0.25rem; }
@@ -715,6 +741,14 @@ footer {
       binary on every build.
     </p>
     <p class="footnote">* Nothing is truly irreversible. Witness aims to make it exceptionally difficult.</p>
+    <div style="text-align:center"><a class="arch-btn" href="./architecture/index.html">Explore the Architecture</a></div>
+    <div style="margin-top:2rem">
+      <div class="arch-stack">
+        <a href="./architecture/ring0.html" class="layer-0"><img src="preview3.png" alt="Ring-0 Architecture"></a>
+        <a href="./architecture/drm.html" class="layer-1"><img src="preview2.png" alt="DRM Architecture"></a>
+        <a href="./architecture/index.html" class="layer-2"><img src="preview.png" alt="Standalone Architecture"></a>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -818,10 +852,10 @@ footer {
 <section id="impersonation">
   <div class="container reveal">
     <p class="about-text">
-      Witness can faithfully, and very intelligently, mimic the signatures, structures,
-      and behaviors of other virtualizers, packers, and obfuscators. Analysts waste
-      time applying the wrong toolchain. Automated classifiers report the wrong product.
-      The real protection remains unidentified.
+      Witness can mimic the signatures, structures, and behavioral fingerprints of other
+      virtualizers, packers, and obfuscators. Analysts waste time applying the wrong
+      toolchain. Automated classifiers report the wrong product. The real protection
+      remains unidentified.
     </p>
   </div>
 </section>
@@ -869,7 +903,7 @@ footer {
   </div>
 </section>
 
-<footer>WITNESS<br><span style="font-size:0.5rem;opacity:0.5;">Chaos(1.0.0)</span></footer>
+<footer><img src="witness-logo.png" alt="Witness" style="height:18px;width:auto;opacity:0.35;display:block;margin:0 auto 0.6rem;"><span style="font-size:0.5rem;opacity:0.5;">Chaos(1.0.0)</span></footer>
 
 <div class="crackme-overlay" id="crackme-overlay">
   <div class="crackme-dialog">
