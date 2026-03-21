@@ -427,9 +427,9 @@
     <div class="nav-brand"><img src="../witness-logo.png" alt="Witness"> Architecture</div>
     <div class="nav-parts">
       <a class="nav-part nav-home" href="https://witness.dreadsec.co">Home</a>
-      <a class="nav-part active" href="index.html">Standalone</a>
-      <a class="nav-part" href="drm.html">DRM</a>
-      <a class="nav-part" href="ring0.html">Ring-0</a>
+      <a class="nav-part active" href="index.html">Mode 1: Standalone</a>
+      <a class="nav-part" href="drm.html">Mode 2: Always-Online DRM</a>
+      <a class="nav-part" href="ring0.html">Mode 3: Ring-0 Enforcement</a>
       <a class="nav-part" href="novelty.html">Novelty</a>
     </div>
   </nav>
@@ -784,7 +784,7 @@
 
       <div class="flow-node n-red">
         <div class="fn-title">Domain Decrypt</div>
-        <div class="fn-desc">Value decrypted from storage domain using a per-block Feistel key. A taint-breaking operation injects hardware entropy to sever symbolic dependency chains.</div>
+        <div class="fn-desc">Value decrypted from storage domain using a per-instruction Feistel key derived from the one-way ratchet state. A taint-breaking operation injects hardware entropy to sever symbolic dependency chains.</div>
       </div>
       <div class="flow-conn"></div>
 
@@ -796,7 +796,7 @@
 
       <div class="flow-node n-red">
         <div class="fn-title">Domain Re-Encrypt</div>
-        <div class="fn-desc">Result immediately re-encrypted with the current block's Feistel key before storage. The key has rotated since decryption, so input and output ciphertexts are unrelated even for the identity operation.</div>
+        <div class="fn-desc">Result immediately re-encrypted with the current instruction's Feistel key before storage. The key rotates every dispatch via the one-way ratchet, so input and output ciphertexts are unrelated even for the identity operation.</div>
       </div>
       <div class="flow-conn"></div>
 
@@ -889,12 +889,13 @@
         <div class="layer-title">Value Domain Encryption</div>
         <div class="layer-desc">
           All intermediate values in the virtual register file are encrypted at
-          rest. Encryption keys rotate on every basic block transition. Format-preserving
+          rest. Encryption keys rotate on every instruction dispatch via a one-way ratchet,
+          giving each instruction a unique bijection. Format-preserving
           transforms and taint-breaking operations prevent symbolic tracking.
         </div>
         <div class="layer-tags">
           <span class="layer-tag">In-memory</span>
-          <span class="layer-tag">Per-block rotation</span>
+          <span class="layer-tag">Per-instruction rotation</span>
         </div>
       </div>
 
@@ -1282,4 +1283,3 @@
 </script>
 </body>
 </html>
-
