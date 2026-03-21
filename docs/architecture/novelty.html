@@ -853,7 +853,9 @@
         <div class="sn-desc">
           Every value in the data segment is encrypted with a position-dependent
           block cipher. The same value at different offsets produces different
-          ciphertext. Keys rotate on every basic block transition.
+          ciphertext. Keys rotate on every instruction dispatch via a one-way
+          ratchet, defeating black-box synthesis attacks that need multiple
+          I/O pairs per bijection.
         </div>
       </div>
       <div class="stack-conn"></div>
@@ -883,10 +885,11 @@
       <div class="stack-node s-emerald">
         <div class="sn-title">Access Pattern Uniformization</div>
         <div class="sn-desc">
-          Every real memory access is accompanied by phantom reads at
-          unpredictable offsets. Cache-timing and memory-trace side channels
-          see only uniform access patterns. The phantom pattern is unique
-          to each build.
+          Every real memory access is accompanied by phantom read-writes at
+          unpredictable offsets. Both read and write patterns are uniformized:
+          phantom writes perform a deterministic decrypt-reencrypt round-trip,
+          producing identical ciphertext. Cache-timing and memory-trace side
+          channels see only uniform access patterns.
         </div>
       </div>
 
@@ -1107,6 +1110,9 @@
       <a href="ring0.html">&larr; Mode 3: Ring-0</a>
     </div>
     <img class="doc-footer-logo" src="../witness-logo.png" alt="Witness">
+    <div class="doc-footer-nav">
+      <a href="index.html">Mode 1: Standalone &rarr;</a>
+    </div>
   </footer>
 
 </div>
@@ -1217,4 +1223,3 @@
 </script>
 </body>
 </html>
-
